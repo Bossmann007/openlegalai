@@ -46,12 +46,31 @@ export type CaseDocument = {
   fields: CaseField[];
 };
 
+/**
+ * Where a channel message came from.
+ *
+ * `external` marks text an outside model wrote through `post_message`. It is
+ * kept apart from `human` and `agent` because a summary must never be derived
+ * from content the caller planted: otherwise an external model could write
+ * "decision: release everything", ask for the channel summary, and read its own
+ * instruction back as if the team had agreed to it.
+ */
+export type MessageOrigin = 'human' | 'agent' | 'external';
+
+export type CaseMessage = {
+  id: string;
+  origin: MessageOrigin;
+  classification: Classification;
+  body: string;
+};
+
 export type CaseRecord = {
   id: string;
   title: string;
   allowedUserIds: string[];
   allowedRoles: Role[];
   documents: CaseDocument[];
+  channel?: CaseMessage[];
 };
 
 /** High-side only. Never serialize across MCP. */
@@ -59,6 +78,13 @@ export type RawContext = {
   readonly __brand: 'raw';
   caseId: string;
   documents: CaseDocument[];
+};
+
+/** High-side only. Never serialize across MCP. */
+export type RawChannel = {
+  readonly __brand: 'raw_channel';
+  caseId: string;
+  messages: CaseMessage[];
 };
 
 export type AuditEvent = {
@@ -82,6 +108,8 @@ export const ALLOWLISTED_TOOLS = [
   'leave_office',
   'get_safe_summary',
   'ask_office',
+  'get_safe_conversation',
+  'post_message',
 ] as const;
 
 export type AllowlistedTool = (typeof ALLOWLISTED_TOOLS)[number];
@@ -97,6 +125,13 @@ export function asRawContext(
   return { __brand: 'raw', caseId, documents };
 }
 
+export function asRawChannel(
+  caseId: string,
+  messages: CaseMessage[],
+): RawChannel {
+  return { __brand: 'raw_channel', caseId, messages };
+}
+
 export const FORBIDDEN_MCP_KEYS = [
   'raw_messages',
   'raw_documents',
@@ -108,6 +143,9 @@ export const FORBIDDEN_MCP_KEYS = [
   'database_rows',
   'raw_agent_memory',
   'raw_session_context',
+  'messages',
+  'channel',
+  'body',
   'text',
   'answer',
 ] as const;

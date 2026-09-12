@@ -75,6 +75,10 @@ export class McpOfficeServer {
         typeof call.arguments.intent === 'string'
           ? call.arguments.intent
           : undefined,
+      text:
+        typeof call.arguments.text === 'string'
+          ? call.arguments.text
+          : undefined,
     });
 
     if (!result.ok) {

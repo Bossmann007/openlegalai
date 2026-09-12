@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "demo": "tsx src/demo.ts",
     "mcp": "tsx src/mcp/stdio-server.ts",
-    "mcp:smoke": "tsx src/mcp/mcp-smoke.ts"
+    "mcp:smoke": "tsx src/mcp/mcp-smoke.ts",
+    "mcp:http": "tsx src/mcp/http-server.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0"

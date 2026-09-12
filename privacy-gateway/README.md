@@ -43,8 +43,44 @@ npx @modelcontextprotocol/inspector ./scripts/run-mcp.sh -e OFFICE_USER_ID=adv-a
 
 - `enter_office` / `leave_office`
 - `get_safe_summary` / `ask_office`
+- `get_safe_conversation` — channel state as counts and generated statements. No message body, author or timestamp crosses.
+- `post_message` — ingress only. Stored `STRICT` and marked `external`; the ack never echoes the text.
 
-Forbidden: `execute_sql`, `get_raw_document`, and any `user` / `role` key in arguments.
+Forbidden: `execute_sql`, `get_raw_document`, `get_all_messages`, `get_rag_chunks`, and any `user` / `role` key in arguments.
+
+Text posted by an outside model is counted in the channel summary but never
+interpreted, so a caller cannot plant a sentence and read it back as a team
+decision. `test/convergence.test.ts` holds that case.
+
+## Transports
+
+Same allowlist on both; the tool list lives once in `src/mcp/tool-definitions.ts`.
+
+| Transport | Command | Identity |
+|---|---|---|
+| stdio | `npm run mcp` | `OFFICE_USER_ID` / `OFFICE_ROLE` |
+| Streamable HTTP | `npm run mcp:http` | `x-office-user-id` / `x-office-role` headers |
+
+stdio only serves clients that spawn a local process. HTTP is what a
+subscription UI on the network can reach. In front of anything real the HTTP
+port belongs behind a terminator that authenticates the caller and sets those
+headers itself — they are the seam an OAuth resource server plugs into, not the
+authentication.
+
+```bash
+OFFICE_HTTP_PORT=8787 npm run mcp:http
+```
+
+Verified 2026-09-12 with a real MCP client over HTTP: `tools/list` returned the
+six tools, a session opened by `enter_office` survived to the next request, and
+a session opened by an intern was refused to a partner connection.
+
+## Storage seam
+
+`OfficeStore` (`src/store/office-store.ts`) is the boundary between the archive
+and everything above it. `CaseFixtureStore` implements it over JSON today; a
+database implementation replaces it without putting the declassifier or the
+firewall back under review.
 
 ## Layout
 

@@ -1,8 +1,16 @@
 {
   "id": "case-banco-001",
   "title": "Acao de cobranca ficticia",
-  "allowedUserIds": ["adv-ana", "socio-paulo", "est-lia"],
-  "allowedRoles": ["socio", "advogado", "estagiario"],
+  "allowedUserIds": [
+    "adv-ana",
+    "socio-paulo",
+    "est-lia"
+  ],
+  "allowedRoles": [
+    "socio",
+    "advogado",
+    "estagiario"
+  ],
   "documents": [
     {
       "id": "doc-peticao",
@@ -50,6 +58,32 @@
           "classification": "INTERNAL"
         }
       ]
+    }
+  ],
+  "channel": [
+    {
+      "id": "msg-1",
+      "origin": "human",
+      "classification": "STRICT",
+      "body": "Decidimos priorizar a tese de onerosidade excessiva e deixar a nulidade como pedido subsidiario."
+    },
+    {
+      "id": "msg-2",
+      "origin": "human",
+      "classification": "STRICT",
+      "body": "Falta juntar o extrato do contrato. Pendencia documental aberta ate sexta."
+    },
+    {
+      "id": "msg-3",
+      "origin": "agent",
+      "classification": "CONFIDENTIAL",
+      "body": "Jurimetria: a camara decidiu 3 de 4 casos semelhantes contra o banco nos ultimos 12 meses."
+    },
+    {
+      "id": "msg-4",
+      "origin": "human",
+      "classification": "STRICT",
+      "body": "Confirmado com o cliente Joao da Silva por telefone hoje."
     }
   ]
 }
