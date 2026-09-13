@@ -13,7 +13,7 @@ pnpm dev           # tela em http://localhost:8080
 
 `DB_*` fica em `server/.env` (veja `server/.env.example`). Sem o Nest, a tela usa a cópia local do acervo.
 
-Para DataJud ao vivo, copie `DATAJUD_API_KEY` da [wiki do CNJ](https://datajud-wiki.cnj.jus.br/api-publica/acesso/) e `DATAJUD_DEFAULT_TRIBUNAL=tjpr`. Sem a chave a busca falha com erro honesto. Roteiro de 60s: [docs/DEMO.md](docs/DEMO.md).
+Para DataJud, copie `DATAJUD_API_KEY` da [wiki do CNJ](https://datajud-wiki.cnj.jus.br/api-publica/acesso/), `DATAJUD_DEFAULT_TRIBUNAL=tjpr` e `DATAJUD_MODE=auto`. Sem a chave, `auto` cai no replay local rotulado `datajud_captura`. `live` não cai. `cache` só lê `server/src/fixtures/datajud-cache/`. Roteiro de 60s: [docs/DEMO.md](docs/DEMO.md). Advogado + ChatGPT: [docs/DEMO-ADVOGADO-CHATGPT.md](docs/DEMO-ADVOGADO-CHATGPT.md).
 
 ## Documentação
 
