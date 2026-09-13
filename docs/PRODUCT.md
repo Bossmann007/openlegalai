@@ -17,7 +17,7 @@ O advogado informa o **número do processo** (obrigatório) e, opcionalmente, **
 ## Escopo demo vs produção
 | Demo | Depois |
 |------|--------|
-| Fixtures/mocks DataJud-like + ementas com votos | API pública DataJud + fontes oficiais de ementa |
+| DataJud API pública (metadados) + fixture/acervo no Dissidio | Fonte oficial de ementa além do metadado |
 | 1 caso bancário fictício | Mais tribunais / teses |
 | Relatório heurístico simples | Ranking/assertividade aprimorada + cache/filas |
 

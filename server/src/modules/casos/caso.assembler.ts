@@ -655,11 +655,20 @@ function jurimetriaDe(
     const fonte = json as Linha;
     return {
       amostra: numeroDe(valorCampo(fonte, ALIASES.amostra), fallback.amostra),
+      amostraAoVivo: numeroDe(
+        valorCampo(fonte, ["amostraAoVivo", "amostra_ao_vivo"]),
+        fallback.amostraAoVivo || 0
+      ),
+      amostraAcervo: numeroDe(
+        valorCampo(fonte, ["amostraAcervo", "amostra_acervo"]),
+        fallback.amostraAcervo || 0
+      ),
       padrao: textoCampo(fonte, ALIASES.padrao, fallback.padrao),
       interno: textoCampo(fonte, ALIASES.interno, fallback.interno),
       riscos: textosDe(valorCampo(fonte, ALIASES.riscos)).length
         ? textosDe(valorCampo(fonte, ALIASES.riscos))
         : fallback.riscos,
+      honestidade: fallback.honestidade,
     };
   }
 

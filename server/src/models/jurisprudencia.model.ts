@@ -1,4 +1,5 @@
 import { CiteStatus } from "@common/security/cite-or-silent";
+import { FonteFato } from "@common/security/fonte-fato";
 import { OrientacaoCamara } from "@models/processo.model";
 
 export type { CiteStatus };
@@ -24,6 +25,7 @@ export type JurisprudenciaFixture = {
   orientation: OrientacaoCamara | null;
   relatedSubjects: string[];
   citavel: boolean;
+  fonte?: FonteFato;
 };
 
 export type Jurisprudencia = JurisprudenciaFixture & {

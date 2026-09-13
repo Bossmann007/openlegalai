@@ -83,6 +83,9 @@ export function DetalheCaso({ caso, onVoltar }: Props) {
               {ROTULO_STATUS[caso.status]}
             </span>
             <span className="selo neutro">{caso.subtema}</span>
+            {caso.fontes?.jurimetria === "datajud" ? (
+              <span className="selo fonte-datajud">DataJud ao vivo</span>
+            ) : null}
           </div>
           <h2>{caso.titulo}</h2>
           <p>

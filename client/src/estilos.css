@@ -156,6 +156,98 @@ main {
   margin-bottom: 22px;
 }
 
+.datajud-painel {
+  margin: 0 0 28px;
+  padding: 20px 22px 22px;
+  background: var(--papel);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio-sm);
+}
+
+.datajud-cabeca,
+.datajud-formas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.datajud-formas {
+  margin-top: 14px;
+}
+
+.datajud-formas .busca {
+  flex: 1 1 280px;
+}
+
+.datajud-formas .filtro {
+  flex: 0 0 120px;
+  background: var(--papel);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio-sm);
+}
+
+.datajud-formas .filtro input {
+  border: 0;
+  background: transparent;
+  color: var(--texto);
+  outline: none;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+}
+
+.datajud-painel h3 {
+  margin: 10px 0 6px;
+  font-size: 22px;
+}
+
+.botao-datajud {
+  border: 0;
+  border-radius: var(--raio-sm);
+  padding: 12px 16px;
+  background: var(--vinho);
+  color: #fff;
+  font-weight: 600;
+}
+
+.botao-datajud.secundario {
+  background: var(--vinho-medio);
+}
+
+.botao-datajud:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.lista-datajud {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.lista-datajud button {
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--creme);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio-sm);
+}
+
+.lista-datajud strong,
+.lista-datajud p {
+  margin: 6px 0 0;
+}
+
+.datajud-erro,
+.datajud-aviso {
+  margin-top: 14px;
+}
+
 .lista-intro h2,
 .detalhe-topo h2 {
   margin: 4px 0 8px;

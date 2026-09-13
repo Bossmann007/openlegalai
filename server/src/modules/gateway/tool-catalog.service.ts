@@ -212,6 +212,80 @@ export class ToolCatalogService {
           return this.declassifyService.conhecimento(itens, assuntos);
         },
       },
+      {
+        nome: "abrir_datajud",
+        titulo: "Abrir processo DataJud ao vivo",
+        descricao:
+          "Busca a capa na API pública do CNJ (DataJud) e devolve um resumo SafeDTO: tribunal, grau, órgão, assuntos e contagens. Metadados ao vivo, sem partes, CPF ou ementa inventada.",
+        esquema: z.object({
+          processNumber: z
+            .string()
+            .describe("Número CNJ: 0000000-00.0000.0.00.0000"),
+          tribunal: z
+            .string()
+            .optional()
+            .describe("Alias do índice DataJud. Padrão tjpr."),
+        }),
+        somenteLeitura: true,
+        executar: async (argumentos) => {
+          const capa = await this.classificationService.capaDataJud(
+            String(argumentos.processNumber),
+            typeof argumentos.tribunal === "string" ? argumentos.tribunal : undefined
+          );
+          return this.declassifyService.resumoDeCaso(capa);
+        },
+      },
+      {
+        nome: "buscar_datajud",
+        titulo: "Buscar metadados DataJud ao vivo",
+        descricao:
+          "Busca processos na API pública do CNJ por assunto, classe ou texto. Cada hit volta com fonte=datajud e citavel=false quando não há ementa oficial. Sem PII.",
+        esquema: z.object({
+          query: z.string().optional().describe("Texto livre sobre assunto ou classe"),
+          assunto: z.string().optional().describe("Assunto catalogado, ex. Alienação Fiduciária"),
+          classe: z.string().optional().describe("Classe processual"),
+          tribunal: z.string().optional().describe("Alias DataJud, padrão tjpr"),
+        }),
+        somenteLeitura: true,
+        executar: async (argumentos) => {
+          const consulta = [
+            argumentos.assunto,
+            argumentos.classe,
+            argumentos.query,
+          ].filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+          const itens = await this.classificationService.jurisprudenciaDataJud({
+            query: typeof argumentos.query === "string" ? argumentos.query : undefined,
+            assunto: typeof argumentos.assunto === "string" ? argumentos.assunto : undefined,
+            classe: typeof argumentos.classe === "string" ? argumentos.classe : undefined,
+            tribunal: typeof argumentos.tribunal === "string" ? argumentos.tribunal : undefined,
+          });
+          return this.declassifyService.conhecimento(itens, consulta);
+        },
+      },
+      {
+        nome: "comparar_datajud",
+        titulo: "Jurimetria mista DataJud + acervo",
+        descricao:
+          "Cruza metadados DataJud ao vivo com a fixture/acervo interno via DissidioService. Devolve amostra partida (ao vivo vs acervo), alinhamentos e síntese gerada. Sem ementa inventada, sem PII, sem oráculo de vitória.",
+        esquema: z.object({
+          processNumber: z
+            .string()
+            .describe("Número CNJ do processo a comparar"),
+          tribunal: z.string().optional().describe("Alias DataJud, padrão tjpr"),
+        }),
+        somenteLeitura: true,
+        executar: async (argumentos) => {
+          const comparacao = await this.classificationService.comparacaoDataJud(
+            String(argumentos.processNumber),
+            typeof argumentos.tribunal === "string" ? argumentos.tribunal : undefined
+          );
+          return this.declassifyService.jurimetriaMista(
+            comparacao,
+            comparacao.valor.textoSensivel,
+            comparacao.valor.entidades
+          );
+        },
+      },
     ];
   }
 }

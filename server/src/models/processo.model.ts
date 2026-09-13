@@ -1,4 +1,7 @@
-export type OrientacaoCamara = "rejeita_revisao" | "aceita_revisao";
+export type OrientacaoCamara =
+  | "rejeita_revisao"
+  | "aceita_revisao"
+  | "indeterminada";
 
 export type ParteProcesso = {
   papel: string;

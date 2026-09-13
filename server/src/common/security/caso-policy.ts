@@ -73,9 +73,25 @@ export function aplicarPoliticaCaso(caso: Caso): Caso {
     dissidios: (caso.dissidios || []).map(carimbarDissidio),
     jurimetria: {
       amostra: Number.isFinite(caso.jurimetria?.amostra) ? caso.jurimetria.amostra : 0,
+      amostraAoVivo: Number.isFinite(caso.jurimetria?.amostraAoVivo)
+        ? caso.jurimetria.amostraAoVivo
+        : 0,
+      amostraAcervo: Number.isFinite(caso.jurimetria?.amostraAcervo)
+        ? caso.jurimetria.amostraAcervo
+        : 0,
       padrao: sanitizeUntrustedText(caso.jurimetria?.padrao),
       interno: sanitizeUntrustedText(caso.jurimetria?.interno),
       riscos: sanitizeUntrustedList(caso.jurimetria?.riscos || []),
+      honestidade: caso.jurimetria?.honestidade
+        ? {
+            live: "datajud_metadata" as const,
+            acervo:
+              caso.jurimetria.honestidade.acervo === "fixture"
+                ? ("fixture" as const)
+                : ("acervo_interno" as const),
+            ementaOracle: false as const,
+          }
+        : undefined,
     },
     fontes: {} as ProvenienciaCaso,
   };
@@ -240,6 +256,9 @@ function derivarFonteJurimetria(caso: Caso): FonteFato {
   const temDados = caso.jurimetria.amostra || caso.jurimetria.padrao || caso.jurimetria.interno;
   if (!temDados) {
     return "indisponivel";
+  }
+  if ((caso.jurimetria.amostraAoVivo || 0) > 0 || caso.jurimetria.honestidade?.live) {
+    return "datajud";
   }
   if (caso.court?.toUpperCase() === "TJPR") {
     return "tjpr";

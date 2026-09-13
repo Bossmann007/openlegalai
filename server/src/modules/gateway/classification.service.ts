@@ -2,6 +2,10 @@ import { Rotulado, rotular } from "@models/classificacao.model";
 import { JurisprudenciaFixture } from "@models/jurisprudencia.model";
 import { ResultadoPesquisa } from "@models/pesquisa.model";
 import { Processo } from "@models/processo.model";
+import {
+  ComparacaoPublica,
+  DataJudService,
+} from "@modules/datajud/datajud.service";
 import { JurisprudenceService } from "@modules/jurisprudence/jurisprudence.service";
 import { ProcessService } from "@modules/process/process.service";
 import { ResearchService } from "@modules/research/research.service";
@@ -20,7 +24,8 @@ export class ClassificationService {
   constructor(
     private processService: ProcessService,
     private jurisprudenceService: JurisprudenceService,
-    private researchService: ResearchService
+    private researchService: ResearchService,
+    private dataJudService: DataJudService
   ) {}
 
   /** Capa de processo é dado de cliente, mesmo quando o número é público. */
@@ -80,5 +85,31 @@ export class ClassificationService {
       ...resultado.process.parties.map((parte) => parte.nome),
       resultado.process.courtUnit,
     ].filter(Boolean);
+  }
+
+  async capaDataJud(
+    numero: string,
+    tribunal?: string
+  ): Promise<Rotulado<Processo>> {
+    const capa = await this.dataJudService.capaPublica(numero, tribunal);
+    return rotular(capa, "publico", "datajud:capa");
+  }
+
+  async jurisprudenciaDataJud(params: {
+    query?: string;
+    assunto?: string;
+    classe?: string;
+    tribunal?: string;
+  }): Promise<Rotulado<JurisprudenciaFixture[]>> {
+    const itens = await this.dataJudService.precedentesAoVivoPublicos(params);
+    return rotular(itens, "publico", "datajud:metadados");
+  }
+
+  async comparacaoDataJud(
+    numero: string,
+    tribunal?: string
+  ): Promise<Rotulado<ComparacaoPublica>> {
+    const comparacao = await this.dataJudService.comparacaoPublica(numero, tribunal);
+    return rotular(comparacao, "publico", "datajud:comparacao");
   }
 }

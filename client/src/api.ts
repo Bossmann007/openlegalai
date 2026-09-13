@@ -205,6 +205,68 @@ export async function enviarMensagemChat(
   return corpo.mensagem;
 }
 
+export type DataJudHit = {
+  tribunal: string;
+  tribunalAlias: string;
+  numeroProcesso: string;
+  classe: string;
+  assuntos: string[];
+  orgaoJulgador: string;
+  grau: string;
+  dataAjuizamento: string;
+  atualizacao: string;
+};
+
+export async function abrirProcessoDataJud(
+  numeroProcesso: string,
+  tribunal = "tjpr"
+): Promise<Caso> {
+  const resposta = await fetch(`${baseUrl()}/api/datajud/abrir`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ numeroProcesso, tribunal }),
+  });
+  if (!resposta.ok) {
+    throw new Error(await lerErro(resposta));
+  }
+  const corpo = (await resposta.json()) as CasoResposta & { live?: boolean; fonte?: string };
+  if (corpo.zone !== "internal" || !corpo.caso || corpo.fonte !== "datajud") {
+    throw new Error("Resposta inválida do DataJud ao vivo.");
+  }
+  return hidratarPrazos(corpo.caso);
+}
+
+export async function buscarDataJud(params: {
+  query?: string;
+  assunto?: string;
+  classe?: string;
+  tribunal?: string;
+}): Promise<{ tribunal: string; hits: DataJudHit[] }> {
+  const resposta = await fetch(`${baseUrl()}/api/datajud/buscar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query: params.query,
+      assunto: params.assunto,
+      classe: params.classe,
+      tribunal: params.tribunal || "tjpr",
+    }),
+  });
+  if (!resposta.ok) {
+    throw new Error(await lerErro(resposta));
+  }
+  const corpo = (await resposta.json()) as {
+    zone?: string;
+    fonte?: string;
+    tribunal?: string;
+    hits?: DataJudHit[];
+  };
+  if (corpo.zone !== "internal" || corpo.fonte !== "datajud" || !Array.isArray(corpo.hits)) {
+    throw new Error("Resposta inválida do DataJud ao vivo.");
+  }
+  return { tribunal: corpo.tribunal || "tjpr", hits: corpo.hits };
+}
+
 export async function listarPrevencao(casoId: string): Promise<RelatorioPrevencao[]> {
   const resposta = await fetch(
     `${baseUrl()}/api/prevencao?${new URLSearchParams({ casoId }).toString()}`

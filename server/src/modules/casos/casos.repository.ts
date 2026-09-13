@@ -1,9 +1,11 @@
 import { Caso } from "@models/caso.model";
+import { DataJudHit } from "@modules/datajud/datajud.types";
 import { DbService, tabelaAusente } from "@modules/db/db.service";
 import { Injectable, ServiceUnavailableException } from "@nestjs/common";
 import type { RowDataPacket } from "mysql2/promise";
 import {
   cnjDigitos,
+  formatarCnj,
   montarCaso,
   valorCampo,
   type Linha,
@@ -55,6 +57,55 @@ export class CasosRepository {
 
   async listar(): Promise<Caso[]> {
     return this.carregar();
+  }
+
+  async upsertProcessoLive(hit: DataJudHit): Promise<void> {
+    if (!this.db.configurado()) {
+      return;
+    }
+
+    const cnj = formatarCnj(hit.numeroProcesso);
+    const digitos = cnjDigitos(cnj);
+    if (digitos.length !== 20) {
+      return;
+    }
+
+    const assuntos = JSON.stringify(hit.assuntos);
+    const existente = await this.db.consultar<RowDataPacket>(
+      `SELECT id FROM processos WHERE REPLACE(REPLACE(REPLACE(numero_cnj, '-', ''), '.', ''), '/', '') = ? LIMIT 1`,
+      [digitos]
+    );
+
+    if (existente[0]) {
+      await this.db.executar(
+        `UPDATE processos SET tribunal = ?, grau = ?, classe_nome = ?, assuntos_json = ?, orgao_julgador = ?, data_ajuizamento = ?, data_hora_ultima_atualizacao = ?, fonte = 'datajud' WHERE id = ?`,
+        [
+          hit.tribunal,
+          hit.grau,
+          hit.classe,
+          assuntos,
+          hit.orgaoJulgador,
+          hit.dataAjuizamento || null,
+          hit.atualizacao || null,
+          existente[0].id,
+        ]
+      );
+      return;
+    }
+
+    await this.db.executar(
+      `INSERT INTO processos (numero_cnj, tribunal, grau, classe_nome, assuntos_json, orgao_julgador, data_ajuizamento, data_hora_ultima_atualizacao, fonte) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'datajud')`,
+      [
+        cnj,
+        hit.tribunal,
+        hit.grau,
+        hit.classe,
+        assuntos,
+        hit.orgaoJulgador,
+        hit.dataAjuizamento || null,
+        hit.atualizacao || null,
+      ]
+    );
   }
 
   async obter(idOrCnj: string): Promise<Caso | undefined> {

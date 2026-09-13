@@ -320,9 +320,16 @@ export type Caso = {
   dissidios: Dissidio[];
   jurimetria: {
     amostra: number;
+    amostraAoVivo?: number;
+    amostraAcervo?: number;
     padrao: string;
     interno: string;
     riscos: string[];
+    honestidade?: {
+      live: "datajud_metadata";
+      acervo: "fixture" | "acervo_interno";
+      ementaOracle: false;
+    };
   };
   fontes?: ProvenienciaCaso;
 };

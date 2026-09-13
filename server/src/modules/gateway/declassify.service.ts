@@ -11,6 +11,7 @@ import {
 } from "@models/classificacao.model";
 import { JurisprudenciaFixture } from "@models/jurisprudencia.model";
 import { ResultadoPesquisa } from "@models/pesquisa.model";
+import { ComparacaoPublica } from "@modules/datajud/datajud.service";
 import { RelatorioPrevencao } from "@models/prevencao.model";
 import { AndamentoProcesso, Processo } from "@models/processo.model";
 import {
@@ -18,6 +19,7 @@ import {
   EnvelopeSafe,
   FaseProcessual,
   SafeCaseSummary,
+  SafeJurimetriaMista,
   SafeKnowledgeResult,
   SafePrevencaoSummary,
   SafeStrategicUpdate,
@@ -119,6 +121,10 @@ export class DeclassifyService {
             sentido: this.derivarSentido(item.orientation),
             citavel,
             ementa: citavel ? ementaParaCitacao(item) : null,
+            fonte:
+              item.fonte === "datajud" || item.fonte === "tjpr"
+                ? item.fonte
+                : "acervo_interno",
           };
         }),
       },
@@ -216,6 +222,61 @@ export class DeclassifyService {
           "título e resumo do contrato",
           "nomes e qualificação das partes",
           "texto de ementas e votos",
+          "pontuação numérica de chance",
+        ],
+      },
+    };
+
+    this.verificar(dto, textoSensivel, entidadesSensiveis);
+    return dto;
+  }
+
+  jurimetriaMista(
+    rotulado: Rotulado<ComparacaoPublica>,
+    textoSensivel: string[] = [],
+    entidadesSensiveis: string[] = []
+  ): SafeJurimetriaMista {
+    const comparacao = rotulado.valor;
+    const alinhamentos = {
+      alinhados: comparacao.classificadas.filter((item) => item.alignment === "for").length,
+      divergentes: comparacao.classificadas.filter((item) => item.alignment === "diverge")
+        .length,
+      contrarios: comparacao.classificadas.filter((item) => item.alignment === "against")
+        .length,
+      semEmentaCitavel: comparacao.classificadas.filter(
+        (item) => item.alignment === "unknown"
+      ).length,
+    };
+    const faixa = this.derivarFaixa(comparacao.chance);
+
+    const dto: SafeJurimetriaMista = {
+      tipo: "jurimetria_mista",
+      conteudo: {
+        referencia: sanitizeUntrustedText(comparacao.processo.processNumber),
+        tribunal: sanitizeUntrustedText(comparacao.processo.court),
+        amostra: {
+          total: comparacao.amostra.total,
+          aoVivo: comparacao.amostra.aoVivo,
+          acervo: comparacao.amostra.acervo,
+        },
+        honestidade: {
+          live: "datajud_metadata",
+          acervo: comparacao.amostra.honestidade.acervo,
+          ementaOracle: false,
+          oraculo: false,
+        },
+        divergenciaEntreOrgaos: alinhamentos,
+        faixaDeRisco: faixa,
+        sintese: this.textoSinteseMista(comparacao.amostra, alinhamentos, faixa),
+      },
+      declassificacao: {
+        sigiloOrigem: rotulado.sigilo,
+        nivel: this.nivel(rotulado.sigilo, "resumo"),
+        fontes: [rotulado.fonte, "acervo:jurisprudencia"],
+        omitido: [
+          "nomes e qualificação das partes",
+          "texto de petições e contratos",
+          "ementa inventada",
           "pontuação numérica de chance",
         ],
       },
@@ -502,6 +563,31 @@ export class DeclassifyService {
       `Amostra fixture de ${total} precedente(s): ${alinhados} alinhado(s) e ${divergentes} divergente(s).`,
       `A leitura heurística indica ${rotuloFaixa}.`,
       "Não é jurimetria ao vivo nem oráculo de resultado.",
+    ].join(" ");
+  }
+
+  private textoSinteseMista(
+    amostra: ComparacaoPublica["amostra"],
+    alinhamentos: {
+      alinhados: number;
+      divergentes: number;
+      contrarios: number;
+      semEmentaCitavel: number;
+    },
+    faixa: "baixa" | "moderada" | "razoavel" | "indisponivel"
+  ): string {
+    const rotuloFaixa = {
+      baixa: "faixa baixa no órgão de referência",
+      moderada: "faixa moderada",
+      razoavel: "faixa razoável",
+      indisponivel: CHANCE_INDISPONIVEL,
+    }[faixa];
+
+    return [
+      `Comparação mista de ${amostra.total} item(ns): ${amostra.aoVivo} metadado(s) DataJud ao vivo e ${amostra.acervo} do acervo/fixture.`,
+      `${alinhamentos.alinhados} alinhado(s), ${alinhamentos.divergentes} divergente(s), ${alinhamentos.contrarios} contrário(s), ${alinhamentos.semEmentaCitavel} sem ementa citável.`,
+      `A leitura descritiva indica ${rotuloFaixa}.`,
+      "O lado ao vivo é metadado DataJud, não ementa completa nem oráculo de resultado.",
     ].join(" ");
   }
 

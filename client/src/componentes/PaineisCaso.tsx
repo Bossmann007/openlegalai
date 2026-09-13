@@ -229,6 +229,9 @@ export function PainelResultados({ caso }: { caso: Caso }) {
 export function PainelJurimetria({ caso }: { caso: Caso }) {
   const total = caso.votos.for + caso.votos.against + caso.votos.diverge;
   const amostraValida = caso.jurimetria.amostra > 0;
+  const aoVivo = caso.jurimetria.amostraAoVivo || 0;
+  const acervo = caso.jurimetria.amostraAcervo || 0;
+  const mista = aoVivo > 0 || Boolean(caso.jurimetria.honestidade);
   const porAlinhamento = {
     for: caso.jurisprudencias.filter((item) => item.alignment === "for" && item.ementa),
     against: caso.jurisprudencias.filter((item) => item.alignment === "against" && item.ementa),
@@ -240,12 +243,24 @@ export function PainelJurimetria({ caso }: { caso: Caso }) {
       <header className="painel-cabeca">
         <h3>Jurimetria</h3>
         <p>
-          {amostraValida
-            ? `${caso.jurimetria.amostra} acórdãos oficiais neste recorte.`
-            : "Leitura das ementas oficiais deste caso."}
+          {mista
+            ? `Amostra descritiva: ${aoVivo} DataJud ao vivo + ${acervo} acervo/fixture (${caso.jurimetria.amostra} no total).`
+            : amostraValida
+              ? `${caso.jurimetria.amostra} acórdãos oficiais neste recorte.`
+              : "Leitura das ementas oficiais deste caso."}
         </p>
         <SeloFonte fonte={caso.fontes?.jurimetria || "tjpr"} />
       </header>
+
+      {mista ? (
+        <article className="cartao-suave datajud-aviso">
+          <p className="olho">Honestidade</p>
+          <p>
+            O lado ao vivo é metadado DataJud (classe, assuntos, movimentos).
+            Não é ementa completa, nem garantia de vitória, nem oráculo.
+          </p>
+        </article>
+      ) : null}
 
       {total === 0 ? (
         <div className="vazio jurimetria-vazio">
