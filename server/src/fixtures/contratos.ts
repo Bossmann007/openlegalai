@@ -188,4 +188,20 @@ export const CONTRATOS_INICIAIS: Contrato[] = [
     "Banco",
     "Serviço cobrado sem relatório correspondente."
   ),
+  contrato(
+    "1",
+    1,
+    "Instrumento de alienação fiduciária",
+    "09/01/2012",
+    "Cliente",
+    "Contrato bancário com garantia fiduciária apontado na capa do caso."
+  ),
+  contrato(
+    "6",
+    1,
+    "Contrato bancário da apelação",
+    "01/06/2021",
+    "Cliente",
+    "Instrumento de contratos bancários ligado à apelação cível do caso."
+  ),
 ];

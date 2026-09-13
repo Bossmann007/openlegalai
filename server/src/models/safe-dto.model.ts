@@ -102,8 +102,26 @@ export type SafeOfficeManifest = EnvelopeSafe<
   }
 >;
 
+export type SafePrevencaoSummary = EnvelopeSafe<
+  "prevencao_summary",
+  {
+    posicaoCliente: "consumidor" | "instituicao_financeira";
+    amostra: { total: number; fonte: "fixture" };
+    faixaDeRisco: "baixa" | "moderada" | "razoavel" | "indisponivel";
+    medidasPreProcessuais: string[];
+    honestidade: {
+      rotulo: "fixture/heuristica";
+      jurimetriaAoVivo: false;
+      oraculo: false;
+    };
+    /** Texto gerado. Sem título de contrato, parte ou CPF. */
+    sintese: string;
+  }
+>;
+
 export type QualquerSafeDTO =
   | SafeCaseSummary
   | SafeKnowledgeResult
   | SafeStrategicUpdate
-  | SafeOfficeManifest;
+  | SafeOfficeManifest
+  | SafePrevencaoSummary;

@@ -406,6 +406,37 @@ main {
   font-size: 13px;
 }
 
+.aviso-honestidade {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  background: var(--diverge-fundo);
+  color: var(--diverge);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.form-prevencao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.form-prevencao .botao-enviar {
+  height: 44px;
+}
+
+.prevencao-relatorio {
+  display: grid;
+  gap: 16px;
+}
+
+.prevencao-relatorio .lista-limpa {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
 .selo.relacao-tema {
   background: var(--diverge-fundo);
   color: var(--diverge);

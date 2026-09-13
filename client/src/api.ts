@@ -1,6 +1,6 @@
 import { CASOS } from "./dados";
 import { hidratarPrazos } from "./prazos-escritorio";
-import { Caso, Documento, Mensagem } from "./tipos";
+import { Caso, Documento, Mensagem, PosicaoCliente, RelatorioPrevencao } from "./tipos";
 
 type ListaCasosResposta = {
   zone?: string;
@@ -203,6 +203,46 @@ export async function enviarMensagemChat(
     throw new Error("Resposta inválida do chat interno.");
   }
   return corpo.mensagem;
+}
+
+export async function listarPrevencao(casoId: string): Promise<RelatorioPrevencao[]> {
+  const resposta = await fetch(
+    `${baseUrl()}/api/prevencao?${new URLSearchParams({ casoId }).toString()}`
+  );
+  if (!resposta.ok) {
+    throw new Error(await lerErro(resposta));
+  }
+  const corpo = (await resposta.json()) as {
+    zone?: string;
+    relatorios?: RelatorioPrevencao[];
+  };
+  if (corpo.zone !== "internal" || !Array.isArray(corpo.relatorios)) {
+    throw new Error("Resposta inválida da análise preventiva.");
+  }
+  return corpo.relatorios;
+}
+
+export async function analisarPrevencao(
+  contratoId: string,
+  posicaoCliente: PosicaoCliente,
+  casoId: string
+): Promise<RelatorioPrevencao> {
+  const resposta = await fetch(`${baseUrl()}/api/prevencao/analisar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contratoId, posicaoCliente, casoId }),
+  });
+  if (!resposta.ok) {
+    throw new Error(await lerErro(resposta));
+  }
+  const corpo = (await resposta.json()) as {
+    zone?: string;
+    relatorio?: RelatorioPrevencao;
+  };
+  if (corpo.zone !== "internal" || !corpo.relatorio) {
+    throw new Error("Resposta inválida da análise preventiva.");
+  }
+  return corpo.relatorio;
 }
 
 /** A tela continua de pé com a cópia local, mas o motivo tem de ficar visível. */
