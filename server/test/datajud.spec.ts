@@ -26,6 +26,7 @@ import { JurisprudenceService } from "../src/modules/jurisprudence/jurisprudence
 import { CasosService } from "../src/modules/casos/casos.service";
 import { ProcessService } from "../src/modules/process/process.service";
 import { rotular } from "../src/models/classificacao.model";
+import { expandirAssuntosRelacionados } from "../src/fixtures/vocabulario";
 import { z } from "zod";
 
 const SOURCE_COM_PII = {
@@ -87,6 +88,39 @@ function casoMinimo(parcial: Partial<Caso> = {}): Caso {
     fontes: undefined,
     ...parcial,
   };
+}
+
+function servicoDataJud(opcoes: {
+  hit: NonNullable<ReturnType<typeof hitDeSource>>;
+  liveHits?: unknown[] | Error;
+  base?: Caso;
+}): DataJudService {
+  return new DataJudService(
+    {
+      alias: () => "tjpr",
+      buscarPorCnj: async () => [opcoes.hit],
+      buscar: async () => {
+        if (opcoes.liveHits instanceof Error) {
+          throw opcoes.liveHits;
+        }
+        return opcoes.liveHits ?? [];
+      },
+    } as unknown as DataJudClient,
+    {
+      obterDoAcervo: async () => opcoes.base,
+      guardarLive: () => undefined,
+      tentarPersistirLive: async () => undefined,
+    } as unknown as CasosService,
+    {
+      normalizarNumero: (numero: string) => numero,
+      numeroValido: () => true,
+      buscarCapa: () => {
+        throw new Error("no fixture");
+      },
+    } as unknown as ProcessService,
+    new JurisprudenceService(),
+    new DissidioService()
+  );
 }
 
 describe("DataJud mapper", () => {
@@ -273,27 +307,10 @@ describe("comparação mista e cite-or-silent", () => {
 
   it("falha da busca relacionada devolve set ao vivo vazio — zero hits falsos", async () => {
     const hit = hitDeSource(SOURCE_COM_PII, "tjpr")!;
-    const servico = new DataJudService(
-      {
-        alias: () => "tjpr",
-        buscarPorCnj: async () => [hit],
-        buscar: async () => {
-          throw new Error("related search down");
-        },
-      } as unknown as DataJudClient,
-      {
-        obterDoAcervo: async () => undefined,
-      } as unknown as CasosService,
-      {
-        normalizarNumero: (numero: string) => numero,
-        numeroValido: () => true,
-        buscarCapa: () => {
-          throw new Error("no fixture");
-        },
-      } as unknown as ProcessService,
-      new JurisprudenceService(),
-      new DissidioService()
-    );
+    const servico = servicoDataJud({
+      hit,
+      liveHits: new Error("related search down"),
+    });
 
     const comparacao = await servico.comparacaoPublica(hit.numeroProcesso, "tjpr");
     expect(comparacao.amostra.aoVivo).toBe(0);
@@ -303,6 +320,89 @@ describe("comparação mista e cite-or-silent", () => {
         (item) => item.processNumber === hit.numeroProcesso && item.fonte === "datajud"
       )
     ).toBe(false);
+  });
+
+  it("rótulos CNJ de alienação fiduciária resolvem para Contratos bancários", () => {
+    expect(expandirAssuntosRelacionados(["Alienação Fiduciária"])).toEqual([
+      "Contratos bancários",
+    ]);
+    expect(expandirAssuntosRelacionados(["Busca e Apreensão"])).toEqual([
+      "Contratos bancários",
+    ]);
+    expect(expandirAssuntosRelacionados(["tarifas"])).toEqual(["Tarifa de cadastro"]);
+    expect(expandirAssuntosRelacionados(["Direito de vizinhança"])).toEqual([]);
+  });
+
+  it("buscarRelacionadas casa Alienação Fiduciária com a fixture bancária", () => {
+    const ids = new JurisprudenceService()
+      .buscarRelacionadas(["Alienação Fiduciária"])
+      .map((item) => item.id);
+
+    expect(ids).toEqual([
+      "juris-tjsp-15-tarifa",
+      "juris-tjsp-11-prestamista",
+      "juris-tjsp-37-tarifa",
+      "juris-stj-2secao-cadastro",
+      "juris-tjsp-13-juros",
+      "juris-tjsp-16-contrato",
+      "juris-tjsp-22-sem-ementa",
+    ]);
+    expect(new JurisprudenceService().buscarRelacionadas(["Direito de vizinhança"])).toEqual(
+      []
+    );
+  });
+
+  it("abrir sem TiDB e sem hits ao vivo ainda devolve amostra de fixture", async () => {
+    const hit = hitDeSource(SOURCE_COM_PII, "tjpr")!;
+    const servico = servicoDataJud({ hit, liveHits: [] });
+
+    const caso = await servico.abrir(hit.numeroProcesso, "tjpr");
+
+    expect(caso.jurimetria).toMatchObject({
+      amostra: 7,
+      amostraAoVivo: 0,
+      amostraAcervo: 7,
+      honestidade: {
+        live: "datajud_metadata",
+        acervo: "fixture",
+        ementaOracle: false,
+      },
+    });
+    expect(caso.jurisprudencias.map((item) => item.id)).toEqual([
+      "juris-tjsp-15-tarifa",
+      "juris-tjsp-11-prestamista",
+      "juris-tjsp-37-tarifa",
+      "juris-stj-2secao-cadastro",
+      "juris-tjsp-13-juros",
+      "juris-tjsp-16-contrato",
+      "juris-tjsp-22-sem-ementa",
+    ]);
+    expect(caso.jurisprudencias.every((item) => item.fonte !== "datajud")).toBe(true);
+    expect(caso.jurimetria.padrao).toMatch(/7 jurisprudências/);
+    expect(caso.fontes?.jurimetria).toBe("acervo_interno");
+  });
+
+  it("busca relacionada vazia não inventa DataJud e mantém o acervo/fixture", async () => {
+    const hit = hitDeSource(SOURCE_COM_PII, "tjpr")!;
+    const servico = servicoDataJud({
+      hit,
+      liveHits: new Error("related search down"),
+    });
+
+    const comparacao = await servico.comparacaoPublica(hit.numeroProcesso, "tjpr");
+
+    expect(comparacao.amostra).toEqual({
+      total: 7,
+      aoVivo: 0,
+      acervo: 7,
+      honestidade: {
+        live: "datajud_metadata",
+        acervo: "fixture",
+        ementaOracle: false,
+      },
+    });
+    expect(comparacao.classificadas.filter((item) => item.fonte === "datajud")).toEqual([]);
+    expect(comparacao.classificadas).toHaveLength(7);
   });
 });
 
