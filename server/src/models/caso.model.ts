@@ -138,7 +138,7 @@ export type Dissidio = {
 };
 
 export type HonestidadeJurimetria = {
-  live: "datajud_metadata";
+  live: "datajud_metadata" | "datajud_captura";
   acervo: "fixture" | "acervo_interno";
   ementaOracle: false;
 };

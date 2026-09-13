@@ -5,7 +5,7 @@ import { DataJudService } from "./datajud.service";
 
 /**
  * Internal trusted-zone office API. Not an MCP egress surface.
- * Live DataJud metadata only. Never fabricate hits when the CNJ API fails.
+ * Live DataJud metadata or an honest local replay. Never fabricate hits.
  */
 @Controller("datajud")
 export class DataJudController {
@@ -14,12 +14,24 @@ export class DataJudController {
   @Public()
   @Post("abrir")
   async abrir(@Body() dto: AbrirDataJudDto) {
+    const caso = await this.dataJudService.abrir(dto.numeroProcesso, dto.tribunal);
+    const origem =
+      caso.jurimetria.honestidade?.live === "datajud_captura"
+        ? {
+            live: false as const,
+            fonte: "datajud_captura" as const,
+            rotulo: "captura oficial (replay)" as const,
+          }
+        : {
+            live: true as const,
+            fonte: "datajud" as const,
+            rotulo: "metadados DataJud ao vivo" as const,
+          };
+
     return {
       zone: "internal" as const,
-      live: true,
-      fonte: "datajud" as const,
-      rotulo: "metadados DataJud ao vivo",
-      caso: await this.dataJudService.abrir(dto.numeroProcesso, dto.tribunal),
+      ...origem,
+      caso,
     };
   }
 
@@ -35,10 +47,11 @@ export class DataJudController {
 
     return {
       zone: "internal" as const,
-      live: true,
-      fonte: "datajud" as const,
-      rotulo: "metadados DataJud ao vivo",
-      ...resultado,
+      live: resultado.aoVivo,
+      fonte: resultado.fonte,
+      rotulo: resultado.rotulo,
+      tribunal: resultado.tribunal,
+      hits: resultado.hits,
     };
   }
 }

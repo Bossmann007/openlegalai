@@ -326,7 +326,7 @@ export type Caso = {
     interno: string;
     riscos: string[];
     honestidade?: {
-      live: "datajud_metadata";
+      live: "datajud_metadata" | "datajud_captura";
       acervo: "fixture" | "acervo_interno";
       ementaOracle: false;
     };

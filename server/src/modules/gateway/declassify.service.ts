@@ -1,5 +1,5 @@
 import { ementaCitavel, ementaParaCitacao } from "@common/security/cite-or-silent";
-import { CHANCE_INDISPONIVEL } from "@common/security/fonte-fato";
+import { CHANCE_INDISPONIVEL, FonteFato } from "@common/security/fonte-fato";
 import { sanitizeUntrustedList, sanitizeUntrustedText } from "@common/security/untrusted-text";
 import {
   maiorSigilo,
@@ -30,6 +30,19 @@ import { DlpService } from "./dlp.service";
 
 /** Tamanho da sequência considerada citação literal da fonte. */
 const TAMANHO_NGRAMA = 5;
+
+function fonteConhecimento(
+  fonteItem: FonteFato | undefined,
+  fonteRotulo: string
+): "datajud" | "datajud_captura" | "acervo_interno" | "tjpr" {
+  if (fonteRotulo.startsWith("datajud_captura")) {
+    return "datajud_captura";
+  }
+  if (fonteItem === "datajud" || fonteItem === "tjpr") {
+    return fonteItem;
+  }
+  return "acervo_interno";
+}
 
 export class FalhaDeDeclassificacao extends Error {
   constructor(readonly motivo: string) {
@@ -121,10 +134,7 @@ export class DeclassifyService {
             sentido: this.derivarSentido(item.orientation),
             citavel,
             ementa: citavel ? ementaParaCitacao(item) : null,
-            fonte:
-              item.fonte === "datajud" || item.fonte === "tjpr"
-                ? item.fonte
-                : "acervo_interno",
+            fonte: fonteConhecimento(item.fonte, rotulado.fonte),
           };
         }),
       },
@@ -260,7 +270,10 @@ export class DeclassifyService {
           acervo: comparacao.amostra.acervo,
         },
         honestidade: {
-          live: "datajud_metadata",
+          live:
+            comparacao.amostra.honestidade.live === "datajud_captura"
+              ? "datajud_captura"
+              : "datajud_metadata",
           acervo: comparacao.amostra.honestidade.acervo,
           ementaOracle: false,
           oraculo: false,
@@ -584,10 +597,14 @@ export class DeclassifyService {
     }[faixa];
 
     return [
-      `Comparação mista de ${amostra.total} item(ns): ${amostra.aoVivo} metadado(s) DataJud ao vivo e ${amostra.acervo} do acervo/fixture.`,
+      `Comparação mista de ${amostra.total} item(ns): ${amostra.aoVivo} metadado(s) DataJud (${
+        amostra.honestidade.live === "datajud_captura" ? "captura oficial (replay)" : "ao vivo"
+      }) e ${amostra.acervo} do acervo/fixture.`,
       `${alinhamentos.alinhados} alinhado(s), ${alinhamentos.divergentes} divergente(s), ${alinhamentos.contrarios} contrário(s), ${alinhamentos.semEmentaCitavel} sem ementa citável.`,
       `A leitura descritiva indica ${rotuloFaixa}.`,
-      "O lado ao vivo é metadado DataJud, não ementa completa nem oráculo de resultado.",
+      amostra.honestidade.live === "datajud_captura"
+        ? "O lado DataJud é captura oficial (replay), não ementa completa nem oráculo de resultado."
+        : "O lado ao vivo é metadado DataJud, não ementa completa nem oráculo de resultado.",
     ].join(" ");
   }
 

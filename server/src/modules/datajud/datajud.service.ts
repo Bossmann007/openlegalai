@@ -21,7 +21,7 @@ import {
   precedentesDeHits,
   processoDeHit,
 } from "./datajud.mapper";
-import { AmostraMista, DataJudHit } from "./datajud.types";
+import { AmostraMista, DataJudHit, DataJudOrigem, ORIGEM_LIVE, origemMaisHonesta } from "./datajud.types";
 
 export type ComparacaoPublica = {
   processo: Processo;
@@ -29,6 +29,7 @@ export type ComparacaoPublica = {
   amostra: AmostraMista;
   dissidio: RelatorioDissidio;
   chance: RelatorioChance;
+  origem: DataJudOrigem;
 };
 
 export type ComparacaoComTaint = ComparacaoPublica & {
@@ -57,13 +58,13 @@ export class DataJudService {
     }
 
     const alias = this.client.alias(tribunal);
-    const hits = await this.client.buscarPorCnj(numero, alias);
-    const hit = hits[0];
+    const pesquisa = await this.client.buscarPorCnj(numero, alias);
+    const hit = pesquisa.hits[0];
     if (!hit) {
       throw erroVazio(numero, alias);
     }
 
-    const caso = await this.compararEMontar(hit, alias);
+    const caso = await this.compararEMontar(hit, alias, pesquisa.origem);
     this.casosService.guardarLive(caso);
     await this.casosService.tentarPersistirLive(hit);
     return caso;
@@ -74,18 +75,30 @@ export class DataJudService {
     assunto?: string;
     classe?: string;
     tribunal?: string;
-  }): Promise<{ tribunal: string; aoVivo: true; fonte: "datajud"; hits: DataJudHit[] }> {
+  }): Promise<{
+    tribunal: string;
+    aoVivo: boolean;
+    fonte: DataJudOrigem["fonte"];
+    rotulo: DataJudOrigem["rotulo"];
+    origem: DataJudOrigem;
+    hits: DataJudHit[];
+  }> {
     const alias = this.client.alias(params.tribunal);
-    const hits = await this.client.buscar({ ...params, tribunal: alias });
+    const pesquisa = await this.client.buscar({ ...params, tribunal: alias });
     return {
       tribunal: alias,
-      aoVivo: true,
-      fonte: "datajud",
-      hits,
+      aoVivo: pesquisa.origem.aoVivo,
+      fonte: pesquisa.origem.fonte,
+      rotulo: pesquisa.origem.rotulo,
+      origem: pesquisa.origem,
+      hits: pesquisa.hits,
     };
   }
 
-  async capaPublica(numeroProcesso: string, tribunal?: string): Promise<Processo> {
+  async capaPublica(
+    numeroProcesso: string,
+    tribunal?: string
+  ): Promise<{ processo: Processo; origem: DataJudOrigem }> {
     const numero = this.processService.normalizarNumero(numeroProcesso);
     if (!this.processService.numeroValido(numero)) {
       throw erroInvalido(
@@ -94,12 +107,15 @@ export class DataJudService {
     }
 
     const alias = this.client.alias(tribunal);
-    const hits = await this.client.buscarPorCnj(numero, alias);
-    if (!hits[0]) {
+    const pesquisa = await this.client.buscarPorCnj(numero, alias);
+    if (!pesquisa.hits[0]) {
       throw erroVazio(numero, alias);
     }
 
-    return processoDeHit(hits[0]);
+    return {
+      processo: processoDeHit(pesquisa.hits[0]),
+      origem: pesquisa.origem,
+    };
   }
 
   async precedentesAoVivoPublicos(params: {
@@ -107,9 +123,12 @@ export class DataJudService {
     assunto?: string;
     classe?: string;
     tribunal?: string;
-  }): Promise<JurisprudenciaFixture[]> {
+  }): Promise<{ itens: JurisprudenciaFixture[]; origem: DataJudOrigem }> {
     const resultado = await this.buscar(params);
-    return resultado.hits.map((hit, indice) => fixtureDeHit(hit, indice));
+    return {
+      itens: resultado.hits.map((hit, indice) => fixtureDeHit(hit, indice)),
+      origem: resultado.origem,
+    };
   }
 
   async comparacaoPublica(
@@ -124,8 +143,8 @@ export class DataJudService {
     }
 
     const alias = this.client.alias(tribunal);
-    const hits = await this.client.buscarPorCnj(numero, alias);
-    const hit = hits[0];
+    const pesquisa = await this.client.buscarPorCnj(numero, alias);
+    const hit = pesquisa.hits[0];
     if (!hit) {
       throw erroVazio(numero, alias);
     }
@@ -134,23 +153,26 @@ export class DataJudService {
     const capa = this.capaComparacao(hit, base);
     capa.parties = [];
     const assuntos = this.assuntosComparacao(hit, base, capa);
-    const liveFixtures = await this.precedentesAoVivo(assuntos, alias, hit);
+    const relacionados = await this.precedentesAoVivo(assuntos, alias, hit);
     const acervoFixtures = this.acervoParaComparacao(base, assuntos);
     const classificadas = this.dissidioService.classificar(capa, [
       ...acervoFixtures,
-      ...liveFixtures,
+      ...relacionados.itens,
     ]);
+    const origem = origemMaisHonesta(pesquisa.origem, relacionados.origem);
 
     return {
       processo: capa,
       classificadas,
       amostra: amostraDe(
-        liveFixtures.length,
+        relacionados.itens.length,
         acervoFixtures.length,
-        base ? "acervo_interno" : "fixture"
+        base ? "acervo_interno" : "fixture",
+        origem.kind === "captura" ? "datajud_captura" : "datajud_metadata"
       ),
       dissidio: this.dissidioService.montarRelatorioDissidio(capa, classificadas),
       chance: this.dissidioService.montarRelatorioChance(capa, classificadas),
+      origem,
       textoSensivel: this.textoSensivelAcervo(base),
       entidades: this.entidadesAcervo(base),
     };
@@ -182,25 +204,31 @@ export class DataJudService {
     ].filter((item): item is string => Boolean(item && item.trim()));
   }
 
-  private async compararEMontar(hit: DataJudHit, alias: string): Promise<Caso> {
+  private async compararEMontar(
+    hit: DataJudHit,
+    alias: string,
+    origemCapa: DataJudOrigem
+  ): Promise<Caso> {
     const base = await this.casosService.obterDoAcervo(hit.numeroProcesso);
     const capa = this.capaComparacao(hit, base);
     const assuntos = this.assuntosComparacao(hit, base, capa);
 
-    const liveFixtures = await this.precedentesAoVivo(assuntos, alias, hit);
+    const relacionados = await this.precedentesAoVivo(assuntos, alias, hit);
     const acervoFixtures = this.acervoParaComparacao(base, assuntos);
 
-    const merged: JurisprudenciaFixture[] = [...acervoFixtures, ...liveFixtures];
+    const merged: JurisprudenciaFixture[] = [...acervoFixtures, ...relacionados.itens];
     const classificadas = this.dissidioService.classificar(capa, merged);
     const dissidio = this.dissidioService.montarRelatorioDissidio(capa, classificadas);
     const chance = this.dissidioService.montarRelatorioChance(capa, classificadas);
 
     const juris = classificadas.map((item) => casoJurisDeClassificada(item));
+    const origem = origemMaisHonesta(origemCapa, relacionados.origem);
 
     const amostra = amostraDe(
-      liveFixtures.length,
+      relacionados.itens.length,
       acervoFixtures.length,
-      base ? "acervo_interno" : "fixture"
+      base ? "acervo_interno" : "fixture",
+      origem.kind === "captura" ? "datajud_captura" : "datajud_metadata"
     );
 
     return montarCasoLive(
@@ -261,26 +289,29 @@ export class DataJudService {
     assuntos: string[],
     alias: string,
     capa: DataJudHit
-  ): Promise<JurisprudenciaFixture[]> {
+  ): Promise<{ itens: JurisprudenciaFixture[]; origem: DataJudOrigem }> {
     const termo = assuntos[0] || capa.classe;
     if (!termo) {
-      return [];
+      return { itens: [], origem: ORIGEM_LIVE };
     }
 
     try {
-      const hits = await this.client.buscar({
+      const pesquisa = await this.client.buscar({
         assunto: termo,
         query: termo,
         tribunal: alias,
       });
-      return precedentesDeHits(hits, capa.numeroProcesso);
+      return {
+        itens: precedentesDeHits(pesquisa.hits, capa.numeroProcesso),
+        origem: pesquisa.origem,
+      };
     } catch (erro) {
       this.logger.warn(
-        `Busca de precedentes DataJud falhou após a capa ao vivo: ${
+        `Busca de precedentes DataJud falhou após a capa: ${
           erro instanceof Error ? erro.message : String(erro)
         }`
       );
-      return [];
+      return { itens: [], origem: ORIGEM_LIVE };
     }
   }
 }

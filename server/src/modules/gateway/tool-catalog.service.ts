@@ -215,9 +215,9 @@ export class ToolCatalogService {
       },
       {
         nome: "abrir_datajud",
-        titulo: "Abrir processo DataJud ao vivo",
+        titulo: "Abrir processo DataJud",
         descricao:
-          "Busca a capa na API pública do CNJ (DataJud) e devolve um resumo SafeDTO: tribunal, grau, órgão, assuntos e contagens. Metadados ao vivo, sem partes, CPF ou ementa inventada.",
+          "Busca a capa na API pública do CNJ (DataJud) e devolve um resumo SafeDTO: tribunal, grau, órgão, assuntos e contagens. Sem partes, CPF ou ementa inventada. Se DATAJUD_MODE=auto e a API pública responder 429/rede, devolve captura local com fonte datajud_captura.",
         esquema: z.object({
           processNumber: z
             .string()
@@ -241,9 +241,9 @@ export class ToolCatalogService {
       },
       {
         nome: "buscar_datajud",
-        titulo: "Buscar metadados DataJud ao vivo",
+        titulo: "Buscar metadados DataJud",
         descricao:
-          "Busca processos na API pública do CNJ por assunto, classe ou texto. Cada hit volta com fonte=datajud e citavel=false quando não há ementa oficial. Sem PII.",
+          "Busca processos na API pública do CNJ por assunto, classe ou texto. Cada hit volta com citavel=false quando não há ementa oficial. Sem PII. Replay local usa fonte=datajud_captura e nunca inventa hits.",
         esquema: z.object({
           query: z
             .string()
@@ -286,7 +286,7 @@ export class ToolCatalogService {
         nome: "comparar_datajud",
         titulo: "Jurimetria mista DataJud + acervo",
         descricao:
-          "Cruza metadados DataJud ao vivo com a fixture/acervo interno via DissidioService. Devolve amostra partida (ao vivo vs acervo), alinhamentos e síntese gerada. Sem ementa inventada, sem PII, sem oráculo de vitória.",
+          "Cruza metadados DataJud (ao vivo ou captura oficial) com a fixture/acervo interno via DissidioService. Devolve amostra partida, alinhamentos e síntese gerada. Sem ementa inventada, sem PII, sem oráculo de vitória.",
         esquema: z.object({
           processNumber: z
             .string()

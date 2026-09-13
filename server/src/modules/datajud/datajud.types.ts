@@ -31,7 +31,43 @@ export type DataJudErroKind =
   | "tribunal"
   | "rede"
   | "vazio"
-  | "invalido";
+  | "invalido"
+  | "cache_miss";
+
+export type DataJudMode = "auto" | "live" | "cache";
+
+export type DataJudOrigem =
+  | {
+      kind: "live";
+      fonte: "datajud";
+      rotulo: "metadados DataJud ao vivo";
+      aoVivo: true;
+    }
+  | {
+      kind: "captura";
+      fonte: "datajud_captura";
+      rotulo: "captura oficial (replay)";
+      aoVivo: false;
+    };
+
+export const ORIGEM_LIVE: DataJudOrigem = {
+  kind: "live",
+  fonte: "datajud",
+  rotulo: "metadados DataJud ao vivo",
+  aoVivo: true,
+};
+
+export const ORIGEM_CAPTURA: DataJudOrigem = {
+  kind: "captura",
+  fonte: "datajud_captura",
+  rotulo: "captura oficial (replay)",
+  aoVivo: false,
+};
+
+export type DataJudPesquisa = {
+  hits: DataJudHit[];
+  origem: DataJudOrigem;
+};
 
 export type AmostraMista = {
   total: number;
@@ -39,3 +75,7 @@ export type AmostraMista = {
   acervo: number;
   honestidade: HonestidadeJurimetria;
 };
+
+export function origemMaisHonesta(a: DataJudOrigem, b: DataJudOrigem): DataJudOrigem {
+  return a.kind === "captura" || b.kind === "captura" ? ORIGEM_CAPTURA : ORIGEM_LIVE;
+}

@@ -1,0 +1,48 @@
+{
+  "_openlegalai": {
+    "fonte": "datajud_captura",
+    "rotulo": "captura oficial (replay)",
+    "honesty": "Local Elastic _search replay for TJPR assunto Alienação Fiduciária. Not a live CNJ session. Public metadata only. No parties, CPF, or ementa."
+  },
+  "took": 0,
+  "timed_out": false,
+  "hits": {
+    "total": { "value": 2, "relation": "eq" },
+    "hits": [
+      {
+        "_index": "api_publica_tjpr",
+        "_id": "00008879120258160161",
+        "_source": {
+          "numeroProcesso": "00008879120258160161",
+          "tribunal": "TJPR",
+          "grau": "G1",
+          "classe": { "codigo": 7, "nome": "Procedimento Comum Cível" },
+          "assuntos": [{ "codigo": 10433, "nome": "Alienação Fiduciária" }],
+          "orgaoJulgador": { "nome": "TJPR" },
+          "dataAjuizamento": "2025-01-01T00:00:00",
+          "dataHoraUltimaAtualizacao": "2025-01-01T00:00:00",
+          "movimentos": [
+            { "dataHora": "2025-01-01T00:00:00", "nome": "Distribuição" }
+          ]
+        }
+      },
+      {
+        "_index": "api_publica_tjpr",
+        "_id": "00001065620148160193",
+        "_source": {
+          "numeroProcesso": "00001065620148160193",
+          "tribunal": "TJPR",
+          "grau": "G1",
+          "classe": { "codigo": 7, "nome": "Procedimento Comum Cível" },
+          "assuntos": [{ "codigo": 10433, "nome": "Alienação Fiduciária" }],
+          "orgaoJulgador": { "nome": "TJPR" },
+          "dataAjuizamento": "2014-03-12T00:00:00",
+          "dataHoraUltimaAtualizacao": "2014-03-12T00:00:00",
+          "movimentos": [
+            { "dataHora": "2014-03-12T10:00:00", "nome": "Distribuição" }
+          ]
+        }
+      }
+    ]
+  }
+}

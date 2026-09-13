@@ -62,7 +62,7 @@ export type ItemConhecimento = {
   citavel: boolean;
   /** Só preenchido quando a fonte é pública e a ementa oficial existe. */
   ementa: string | null;
-  fonte?: "datajud" | "acervo_interno" | "tjpr";
+  fonte?: "datajud" | "datajud_captura" | "acervo_interno" | "tjpr";
 };
 
 export type SafeKnowledgeResult = EnvelopeSafe<
@@ -131,7 +131,7 @@ export type SafeJurimetriaMista = EnvelopeSafe<
       acervo: number;
     };
     honestidade: {
-      live: "datajud_metadata";
+      live: "datajud_metadata" | "datajud_captura";
       acervo: "fixture" | "acervo_interno";
       ementaOracle: false;
       oraculo: false;

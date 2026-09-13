@@ -91,8 +91,12 @@ export class ClassificationService {
     numero: string,
     tribunal?: string
   ): Promise<Rotulado<Processo>> {
-    const capa = await this.dataJudService.capaPublica(numero, tribunal);
-    return rotular(capa, "publico", "datajud:capa");
+    const { processo, origem } = await this.dataJudService.capaPublica(numero, tribunal);
+    return rotular(
+      processo,
+      "publico",
+      origem.fonte === "datajud_captura" ? "datajud_captura:capa" : "datajud:capa"
+    );
   }
 
   async jurisprudenciaDataJud(params: {
@@ -101,8 +105,12 @@ export class ClassificationService {
     classe?: string;
     tribunal?: string;
   }): Promise<Rotulado<JurisprudenciaFixture[]>> {
-    const itens = await this.dataJudService.precedentesAoVivoPublicos(params);
-    return rotular(itens, "publico", "datajud:metadados");
+    const { itens, origem } = await this.dataJudService.precedentesAoVivoPublicos(params);
+    return rotular(
+      itens,
+      "publico",
+      origem.fonte === "datajud_captura" ? "datajud_captura:metadados" : "datajud:metadados"
+    );
   }
 
   async comparacaoDataJud(
@@ -119,7 +127,9 @@ export class ClassificationService {
       rotulado: rotular(
         valor,
         sigiloComparacaoDataJud(textoSensivel, entidades),
-        "datajud:comparacao"
+        comparacao.origem.fonte === "datajud_captura"
+          ? "datajud_captura:comparacao"
+          : "datajud:comparacao"
       ),
       textoSensivel,
       entidades,

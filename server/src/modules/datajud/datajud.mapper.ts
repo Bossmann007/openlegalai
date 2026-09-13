@@ -217,7 +217,7 @@ export function casoJurisDeClassificada(item: JurisClassificada): Jurisprudencia
   const ementa = citavel ? item.ementaSnippet || "" : "";
   const resumo =
     fonte === "datajud"
-      ? "Metadados DataJud ao vivo. Sem ementa. Não cite como acórdão."
+      ? "Metadados DataJud. Sem ementa. Não cite como acórdão."
       : item.voteSummary ||
         (item.citeStatus === "nao_citavel"
           ? "Ementa ausente no acervo interno (fixture)."
@@ -249,7 +249,7 @@ export function historicoDeHit(hit: DataJudHit): Andamento[] {
   return hit.movimentos.map((item) => ({
     data: item.data,
     titulo: item.nome,
-    detalhe: `Andamento DataJud (${hit.tribunal}). Metadado ao vivo, sem peça.`,
+    detalhe: `Andamento DataJud (${hit.tribunal}). Metadado oficial, sem peça.`,
   }));
 }
 
@@ -259,7 +259,7 @@ export function resumoDeHit(hit: DataJudHit): string {
     : "Assuntos DataJud não informados.";
   const classe = hit.classe || "Classe não informada";
   const orgao = hit.orgaoJulgador || hit.tribunal;
-  return `${classe} perante ${orgao} (${hit.tribunal}). ${assuntos} Metadados ao vivo — sem ementa.`;
+  return `${classe} perante ${orgao} (${hit.tribunal}). ${assuntos} Metadados DataJud — sem ementa.`;
 }
 
 export function montarCasoLive(
@@ -320,7 +320,9 @@ export function jurimetriaMista(
     amostraAcervo: amostra.acervo,
     padrao: dissidio.narrative,
     interno:
-      "Lado ao vivo: metadados DataJud (classe, assuntos, movimentos, órgão). Não é ementa completa nem oráculo de jurimetria.",
+      amostra.honestidade.live === "datajud_captura"
+        ? "Lado DataJud: captura oficial (replay). Metadados de classe, assuntos, movimentos e órgão. Não é ementa completa nem oráculo de jurimetria."
+        : "Lado DataJud: metadados ao vivo (classe, assuntos, movimentos, órgão). Não é ementa completa nem oráculo de jurimetria.",
     riscos: chance.blindagem,
     honestidade,
   };
@@ -339,14 +341,15 @@ export function dissidiosDeRelatorio(relatorio: RelatorioDissidio): Dissidio[] {
 export function amostraDe(
   aoVivo: number,
   acervo: number,
-  acervoKind: HonestidadeJurimetria["acervo"]
+  acervoKind: HonestidadeJurimetria["acervo"],
+  liveKind: HonestidadeJurimetria["live"] = "datajud_metadata"
 ): AmostraMista {
   return {
     total: aoVivo + acervo,
     aoVivo,
     acervo,
     honestidade: {
-      live: "datajud_metadata",
+      live: liveKind,
       acervo: acervoKind,
       ementaOracle: false,
     },

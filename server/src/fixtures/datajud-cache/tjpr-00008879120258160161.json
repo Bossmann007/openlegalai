@@ -1,0 +1,31 @@
+{
+  "_openlegalai": {
+    "fonte": "datajud_captura",
+    "rotulo": "captura oficial (replay)",
+    "honesty": "Local Elastic _search replay for demo CNJ 0000887-91.2025.8.16.0161. Not a live CNJ session. Public metadata only. No parties, CPF, or ementa."
+  },
+  "took": 0,
+  "timed_out": false,
+  "hits": {
+    "total": { "value": 1, "relation": "eq" },
+    "hits": [
+      {
+        "_index": "api_publica_tjpr",
+        "_id": "00008879120258160161",
+        "_source": {
+          "numeroProcesso": "00008879120258160161",
+          "tribunal": "TJPR",
+          "grau": "G1",
+          "classe": { "codigo": 7, "nome": "Procedimento Comum Cível" },
+          "assuntos": [{ "codigo": 10433, "nome": "Alienação Fiduciária" }],
+          "orgaoJulgador": { "nome": "TJPR" },
+          "dataAjuizamento": "2025-01-01T00:00:00",
+          "dataHoraUltimaAtualizacao": "2025-01-01T00:00:00",
+          "movimentos": [
+            { "dataHora": "2025-01-01T00:00:00", "nome": "Distribuição" }
+          ]
+        }
+      }
+    ]
+  }
+}

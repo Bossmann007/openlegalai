@@ -483,6 +483,19 @@ main {
   color: var(--favor);
 }
 
+.selo.fonte-datajud-captura,
+.datajud-banner-captura {
+  background: var(--diverge-fundo);
+  color: var(--diverge);
+}
+
+.datajud-banner-captura {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
 .aviso-nao-citavel {
   margin: 0 0 12px;
   color: var(--texto-suave);
