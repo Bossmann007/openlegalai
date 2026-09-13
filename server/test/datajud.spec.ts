@@ -123,6 +123,8 @@ describe("DataJud mapper", () => {
   it("capa ao vivo não carrega partes", () => {
     const processo = processoDeHit(hitDeSource(SOURCE_COM_PII, "tjpr")!);
     expect(processo.parties).toEqual([]);
+    expect(processo.courtUnit).toBe("");
+    expect(processo.chamber).toBe("COLOMBO - 2ª VARA CÍVEL");
     expect(processo.chamberOrientation).toBe("indeterminada");
   });
 
@@ -506,6 +508,17 @@ describe("SafeDTO DataJud", () => {
     expect(cnj.safeParse("123").success).toBe(false);
     expect(tribunal.safeParse("x".repeat(21)).success).toBe(false);
     expect(busca.safeParse("x".repeat(201)).success).toBe(false);
+  });
+
+  it("capa DataJud pública atravessa o SafeDTO sem vazar unidade como parte", () => {
+    const processo = processoDeHit(hitDeSource(SOURCE_COM_PII, "tjpr")!);
+    const dto = declassify.resumoDeCaso(rotular(processo, "publico", "datajud_captura:capa"));
+
+    expect(dto.tipo).toBe("case_summary");
+    expect(dto.conteudo.orgaoJulgador).toBe("COLOMBO - 2ª VARA CÍVEL");
+    expect(dto.conteudo.quantidadePartes).toBe(0);
+    expect(dto.declassificacao.fontes).toContain("datajud_captura:capa");
+    expect(JSON.stringify(dto)).not.toContain("Maria Souza");
   });
 
   it("conhecimento DataJud sai sem ementa", () => {

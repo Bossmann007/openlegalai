@@ -76,7 +76,7 @@ export function processoDeHit(hit: DataJudHit): Processo {
   return {
     processNumber: hit.numeroProcesso,
     court: hit.tribunal,
-    courtUnit: hit.orgaoJulgador,
+    courtUnit: "",
     caseClass: hit.classe,
     subjects: hit.assuntos,
     chamber: hit.orgaoJulgador,
