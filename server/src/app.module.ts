@@ -9,6 +9,7 @@ import { GatewayModule } from "@modules/gateway/gateway.module";
 import { JurisprudenceModule } from "@modules/jurisprudence/jurisprudence.module";
 import { McpModule } from "@modules/mcp/mcp.module";
 import { PetitionsModule } from "@modules/petitions/petitions.module";
+import { PrevencaoModule } from "@modules/prevencao/prevencao.module";
 import { ProcessModule } from "@modules/process/process.module";
 import { ResearchModule } from "@modules/research/research.module";
 import { TemplatesModule } from "@modules/templates/templates.module";
@@ -33,6 +34,7 @@ import { AppService } from "./app.service";
     JurisprudenceModule,
     DissidioModule,
     ResearchModule,
+    PrevencaoModule,
     ContractsModule,
     GatewayModule,
     McpModule,

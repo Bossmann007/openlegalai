@@ -2,6 +2,7 @@ import { Identidade } from "@models/gateway.model";
 import { EnvelopeSafe } from "@models/safe-dto.model";
 import { Injectable } from "@nestjs/common";
 import { z } from "zod";
+import { PrevencaoService } from "@modules/prevencao/prevencao.service";
 import { ClassificationService } from "./classification.service";
 import { DeclassifyService } from "./declassify.service";
 
@@ -33,7 +34,8 @@ export class ToolCatalogService {
 
   constructor(
     private classificationService: ClassificationService,
-    private declassifyService: DeclassifyService
+    private declassifyService: DeclassifyService,
+    private prevencaoService: PrevencaoService
   ) {
     this.ferramentas = this.montar();
   }
@@ -138,6 +140,76 @@ export class ToolCatalogService {
             sensivel,
             entidades
           );
+        },
+      },
+      {
+        nome: "analisar_prevencao",
+        titulo: "Análise preventiva segura",
+        descricao:
+          "Cruza um contrato da demo com a fixture de jurisprudência e devolve um SafeDTO: posição do cliente, amostra fixture, faixa heurística e medidas pré-processuais. Sem CPF, partes ou texto do contrato.",
+        esquema: z.object({
+          contratoId: z
+            .string()
+            .describe("Identificador opaco do contrato no acervo interno"),
+          posicaoCliente: z
+            .enum(["consumidor", "instituicao_financeira"])
+            .describe("Posição do cliente no contrato, sem dados pessoais"),
+          casoId: z
+            .string()
+            .optional()
+            .describe("Identificador do caso, quando o id do contrato se repete"),
+        }),
+        somenteLeitura: true,
+        executar: async (argumentos) => {
+          const relatorio = await this.prevencaoService.analisar(
+            String(argumentos.contratoId),
+            argumentos.posicaoCliente as "consumidor" | "instituicao_financeira",
+            typeof argumentos.casoId === "string" ? argumentos.casoId : undefined
+          );
+          const caso = await this.prevencaoService.resolverCaso(relatorio.casoId);
+
+          return this.declassifyService.prevencao(
+            relatorio,
+            this.prevencaoService.textoSensivel(relatorio, caso),
+            this.prevencaoService.entidadesSensiveis(caso)
+          );
+        },
+      },
+      {
+        nome: "buscar_jurisprudencia_prevencao",
+        titulo: "Precedentes da prevenção",
+        descricao:
+          "Busca precedentes da fixture ligados a assuntos catalogados do contrato. Ementa só sai quando a fonte é pública e citável. Sem PII.",
+        esquema: z.object({
+          contratoId: z
+            .string()
+            .optional()
+            .describe("Contrato da demo cujos assuntos alimentam a busca"),
+          casoId: z.string().optional().describe("Caso do contrato, se o id se repetir"),
+          assuntos: z
+            .array(z.string())
+            .optional()
+            .describe("Assuntos catalogados, ex.: ['Tarifa de cadastro']"),
+        }),
+        somenteLeitura: true,
+        executar: async (argumentos) => {
+          let assuntos = Array.isArray(argumentos.assuntos)
+            ? (argumentos.assuntos as string[])
+            : [];
+
+          if (!assuntos.length && typeof argumentos.contratoId === "string") {
+            assuntos = await this.prevencaoService.assuntosDeContrato(
+              argumentos.contratoId,
+              typeof argumentos.casoId === "string" ? argumentos.casoId : undefined
+            );
+          }
+
+          if (!assuntos.length) {
+            assuntos = ["Contratos bancários", "Revisão de contrato"];
+          }
+
+          const itens = this.classificationService.jurisprudencia(assuntos);
+          return this.declassifyService.conhecimento(itens, assuntos);
         },
       },
     ];

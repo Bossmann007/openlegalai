@@ -24,6 +24,8 @@ const MATRIZ: Record<Papel, RegraPapel> = {
       "get_safe_summary",
       "search_safe_knowledge",
       "get_safe_update",
+      "analisar_prevencao",
+      "buscar_jurisprudencia_prevencao",
     ],
     descricao: "Pode perguntar sobre qualquer caso do escritório.",
   },
@@ -33,16 +35,23 @@ const MATRIZ: Record<Papel, RegraPapel> = {
       "get_safe_summary",
       "search_safe_knowledge",
       "get_safe_update",
+      "analisar_prevencao",
+      "buscar_jurisprudencia_prevencao",
     ],
     descricao: "Pode perguntar sobre qualquer caso do escritório.",
   },
   estagiario: {
-    ferramentas: ["enter_office", "search_safe_knowledge", "get_safe_update"],
+    ferramentas: [
+      "enter_office",
+      "search_safe_knowledge",
+      "get_safe_update",
+      "buscar_jurisprudencia_prevencao",
+    ],
     descricao:
       "Pesquisa de tese e leitura estratégica. Não pergunta a situação de um caso específico.",
   },
   gestor: {
-    ferramentas: ["enter_office", "get_safe_update"],
+    ferramentas: ["enter_office", "get_safe_update", "analisar_prevencao"],
     descricao:
       "Leitura estratégica e jurimetria. Não consulta caso nem acervo de conhecimento.",
   },
