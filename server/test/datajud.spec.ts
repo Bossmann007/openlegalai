@@ -87,6 +87,9 @@ describe("DataJud mapper", () => {
     expect(hit?.numeroProcesso).toBe("0000106-56.2014.8.16.0193");
     expect(hit?.classe).toBe("Procedimento Comum Cível");
     expect(hit?.assuntos).toContain("Alienação Fiduciária");
+    expect(hitDeSource({ ...SOURCE_COM_PII, dataAjuizamento: "20140312T100000" }, "tjpr")?.dataAjuizamento).toBe(
+      "2014-03-12"
+    );
     expect(JSON.stringify(hit)).not.toContain("Maria Souza");
     expect(JSON.stringify(hit)).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}/);
   });

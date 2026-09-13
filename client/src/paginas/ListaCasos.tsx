@@ -171,7 +171,7 @@ export function ListaCasos({ onAbrir }: Props) {
             <input
               value={cnj}
               onChange={(evento) => setCnj(evento.target.value)}
-              placeholder="Número CNJ, ex. 0000106-56.2014.8.16.0193"
+              placeholder="Número CNJ, ex. 0000887-91.2025.8.16.0161"
             />
           </label>
           <label className="filtro">

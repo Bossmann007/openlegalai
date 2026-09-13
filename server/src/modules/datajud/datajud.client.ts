@@ -42,10 +42,16 @@ export class DataJudClient {
       throw erroInvalido("Informe o número CNJ do processo.");
     }
 
+    const digitos = numero.replace(/\D/g, "");
+    const should = [{ match: { numeroProcesso: numero } }];
+    if (digitos && digitos !== numero) {
+      should.push({ match: { numeroProcesso: digitos } });
+    }
+
     return this.pesquisar(alias, {
       size: 5,
       query: {
-        match: { numeroProcesso: numero },
+        bool: { should, minimum_should_match: 1 },
       },
     });
   }

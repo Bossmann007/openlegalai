@@ -328,7 +328,14 @@ function dataDe(valor: unknown): string {
     return "";
   }
   const iso = bruto.match(/^(\d{4}-\d{2}-\d{2})/);
-  return iso ? iso[1] : bruto.slice(0, 10);
+  if (iso) {
+    return iso[1];
+  }
+  const compacto = bruto.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (compacto) {
+    return `${compacto[1]}-${compacto[2]}-${compacto[3]}`;
+  }
+  return "";
 }
 
 function rotuloGrau(valor: string): string {
