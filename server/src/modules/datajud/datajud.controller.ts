@@ -24,6 +24,12 @@ export class DataJudController {
   }
 
   @Public()
+  @Post("comparar")
+  async comparar(@Body() dto: AbrirDataJudDto) {
+    return this.abrir(dto);
+  }
+
+  @Public()
   @Post("buscar")
   async buscar(@Body() dto: BuscarDataJudDto) {
     const resultado = await this.dataJudService.buscar({

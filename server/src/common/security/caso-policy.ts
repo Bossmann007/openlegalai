@@ -257,8 +257,14 @@ function derivarFonteJurimetria(caso: Caso): FonteFato {
   if (!temDados) {
     return "indisponivel";
   }
-  if ((caso.jurimetria.amostraAoVivo || 0) > 0 || caso.jurimetria.honestidade?.live) {
+  if ((caso.jurimetria.amostraAoVivo || 0) > 0) {
     return "datajud";
+  }
+  if (
+    caso.jurimetria.honestidade?.acervo === "fixture" ||
+    (caso.jurimetria.amostraAcervo || 0) > 0
+  ) {
+    return "acervo_interno";
   }
   if (caso.court?.toUpperCase() === "TJPR") {
     return "tjpr";

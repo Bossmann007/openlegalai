@@ -236,6 +236,25 @@ export async function abrirProcessoDataJud(
   return hidratarPrazos(corpo.caso);
 }
 
+export async function compararProcessoDataJud(
+  numeroProcesso: string,
+  tribunal = "tjpr"
+): Promise<Caso> {
+  const resposta = await fetch(`${baseUrl()}/api/datajud/comparar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ numeroProcesso, tribunal }),
+  });
+  if (!resposta.ok) {
+    throw new Error(await lerErro(resposta));
+  }
+  const corpo = (await resposta.json()) as CasoResposta & { live?: boolean; fonte?: string };
+  if (corpo.zone !== "internal" || !corpo.caso || corpo.fonte !== "datajud") {
+    throw new Error("Resposta inválida da comparação DataJud.");
+  }
+  return hidratarPrazos(corpo.caso);
+}
+
 export async function buscarDataJud(params: {
   query?: string;
   assunto?: string;

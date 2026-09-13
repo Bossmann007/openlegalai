@@ -1,4 +1,5 @@
 import { ReactNode, useState } from "react";
+import { compararProcessoDataJud } from "../api";
 import { GavetaJuris } from "../componentes/GavetaJuris";
 import {
   IconeContrato,
@@ -37,6 +38,7 @@ import { AbaCaso, Caso, Jurisprudencia, ROTULO_STATUS } from "../tipos";
 type Props = {
   caso: Caso;
   onVoltar: () => void;
+  onCasoAtualizado?: (caso: Caso) => void;
 };
 
 type ItemMenu = {
@@ -64,11 +66,35 @@ const MENU: ItemMenu[] = [
   { id: "relatorios", rotulo: "Relatórios", grupo: "Estratégia", icone: <IconeRelatorio /> },
 ];
 
-export function DetalheCaso({ caso, onVoltar }: Props) {
+export function DetalheCaso({ caso, onVoltar, onCasoAtualizado }: Props) {
   const [aba, setAba] = useState<AbaCaso>("visao");
   const [juris, setJuris] = useState<Jurisprudencia | null>(null);
+  const [gerandoJurimetria, setGerandoJurimetria] = useState(false);
+  const [erroJurimetria, setErroJurimetria] = useState<string | null>(null);
 
   const grupos = ["Caso", "Acervo", "Estratégia"];
+
+  async function gerarJurimetria() {
+    if (!caso.processNumber.trim()) {
+      return;
+    }
+    setErroJurimetria(null);
+    setGerandoJurimetria(true);
+    try {
+      const atualizado = await compararProcessoDataJud(
+        caso.processNumber,
+        caso.court || "tjpr"
+      );
+      onCasoAtualizado?.(atualizado);
+      setAba("jurimetria");
+    } catch (falha: unknown) {
+      setErroJurimetria(
+        falha instanceof Error ? falha.message : "Não foi possível atualizar a jurimetria."
+      );
+    } finally {
+      setGerandoJurimetria(false);
+    }
+  }
 
   return (
     <section className="detalhe">
@@ -91,6 +117,23 @@ export function DetalheCaso({ caso, onVoltar }: Props) {
           <p>
             {caso.processNumber} · {caso.chamber}
           </p>
+          {caso.processNumber ? (
+            <div className="detalhe-acoes">
+              <button
+                className="botao-datajud secundario"
+                type="button"
+                disabled={gerandoJurimetria}
+                onClick={() => {
+                  void gerarJurimetria();
+                }}
+              >
+                {gerandoJurimetria
+                  ? "Atualizando jurimetria…"
+                  : "Gerar/atualizar jurimetria"}
+              </button>
+            </div>
+          ) : null}
+          {erroJurimetria ? <p className="detalhe-erro">{erroJurimetria}</p> : null}
         </div>
       </header>
 

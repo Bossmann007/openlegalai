@@ -594,6 +594,19 @@ main {
   font-size: 30px;
 }
 
+.detalhe-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.detalhe-erro {
+  margin: 8px 0 0;
+  color: var(--contra);
+  font-size: 14px;
+}
+
 .voltar,
 .botao-texto {
   border: 0;

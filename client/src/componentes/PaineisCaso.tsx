@@ -228,10 +228,12 @@ export function PainelResultados({ caso }: { caso: Caso }) {
 
 export function PainelJurimetria({ caso }: { caso: Caso }) {
   const total = caso.votos.for + caso.votos.against + caso.votos.diverge;
-  const amostraValida = caso.jurimetria.amostra > 0;
+  const amostra = caso.jurimetria.amostra || 0;
   const aoVivo = caso.jurimetria.amostraAoVivo || 0;
   const acervo = caso.jurimetria.amostraAcervo || 0;
-  const mista = aoVivo > 0 || Boolean(caso.jurimetria.honestidade);
+  const honestidade = caso.jurimetria.honestidade;
+  const recorteGerado =
+    amostra > 0 || Boolean(caso.jurimetria.padrao) || Boolean(honestidade);
   const porAlinhamento = {
     for: caso.jurisprudencias.filter((item) => item.alignment === "for" && item.ementa),
     against: caso.jurisprudencias.filter((item) => item.alignment === "against" && item.ementa),
@@ -243,16 +245,31 @@ export function PainelJurimetria({ caso }: { caso: Caso }) {
       <header className="painel-cabeca">
         <h3>Jurimetria</h3>
         <p>
-          {mista
-            ? `Amostra descritiva: ${aoVivo} DataJud ao vivo + ${acervo} acervo/fixture (${caso.jurimetria.amostra} no total).`
-            : amostraValida
-              ? `${caso.jurimetria.amostra} acórdãos oficiais neste recorte.`
-              : "Leitura das ementas oficiais deste caso."}
+          {recorteGerado
+            ? `Amostra descritiva: ${aoVivo} DataJud ao vivo + ${acervo} acervo/fixture (${amostra} no total).`
+            : "Leitura das ementas oficiais deste caso."}
         </p>
         <SeloFonte fonte={caso.fontes?.jurimetria || "tjpr"} />
       </header>
 
-      {mista ? (
+      {recorteGerado ? (
+        <article className="cartao-suave">
+          <p className="olho">Amostra</p>
+          <p>
+            {aoVivo} metadados DataJud ao vivo · {acervo} acervo/fixture · {amostra} no
+            recorte.
+          </p>
+          {honestidade ? (
+            <p>
+              Fonte do acervo:{" "}
+              {honestidade.acervo === "fixture" ? "fixture" : "acervo interno"}.
+              Lado ao vivo só entra se a busca DataJud devolveu hits reais.
+            </p>
+          ) : null}
+        </article>
+      ) : null}
+
+      {honestidade ? (
         <article className="cartao-suave datajud-aviso">
           <p className="olho">Honestidade</p>
           <p>
@@ -263,9 +280,16 @@ export function PainelJurimetria({ caso }: { caso: Caso }) {
       ) : null}
 
       {total === 0 ? (
-        <div className="vazio jurimetria-vazio">
-          <p>Sem votos catalogados neste recorte.</p>
-        </div>
+        recorteGerado ? (
+          <p className="votos-vazio-texto jurimetria-vazio">
+            Sem votos catalogados neste recorte. A amostra e a leitura abaixo ainda
+            valem.
+          </p>
+        ) : (
+          <div className="vazio jurimetria-vazio">
+            <p>Sem votos catalogados neste recorte.</p>
+          </div>
+        )
       ) : (
         <div className="barras">
           {(["for", "against", "diverge"] as const).map((chave) => {
