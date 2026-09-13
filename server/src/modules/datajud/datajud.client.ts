@@ -115,7 +115,7 @@ export class DataJudClient {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(corpo),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(30000),
       });
     } catch (erro) {
       const detalhe = erro instanceof Error ? erro.message : "falha de rede";
