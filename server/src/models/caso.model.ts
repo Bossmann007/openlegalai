@@ -137,11 +137,20 @@ export type Dissidio = {
   fonte?: FonteFato;
 };
 
+export type HonestidadeJurimetria = {
+  live: "datajud_metadata";
+  acervo: "fixture" | "acervo_interno";
+  ementaOracle: false;
+};
+
 export type Jurimetria = {
   amostra: number;
+  amostraAoVivo?: number;
+  amostraAcervo?: number;
   padrao: string;
   interno: string;
   riscos: string[];
+  honestidade?: HonestidadeJurimetria;
 };
 
 export type Caso = {

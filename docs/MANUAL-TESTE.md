@@ -21,6 +21,17 @@ Abra **http://localhost:8080**. Não use o IP da rede (`192.168.x.x`) salvo se v
 
 A lista e o detalhe vêm de `GET /api/casos` e `GET /api/casos/:id` no TiDB. Se a API cair, a tela usa a cópia local em `client/src/acervo-real.ts` e avisa no console.
 
+## DataJud ao vivo (home)
+
+Com `DATAJUD_API_KEY` em `server/.env` e Nest no ar:
+
+1. Na lista, use **Abrir processo (DataJud)** com um CNJ do TJPR.
+2. Ou **Buscar no DataJud** por assunto (ex. `Alienação Fiduciária`).
+3. Jurimetria mostra amostra partida (ao vivo + acervo) e o aviso de metadados.
+4. Sem chave, a tela mostra o erro da wiki/rede. Nenhum hit fictício.
+
+Roteiro MCP e curls: [DEMO.md](DEMO.md).
+
 ## O que deve aparecer
 
 - Marca **OpenLegalAI** e escritório **Zhegga Advogados Associados**

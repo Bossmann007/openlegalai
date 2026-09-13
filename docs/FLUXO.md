@@ -16,7 +16,7 @@ Duas opções na mesma tela:
 2. **Importar documento(s)** — ainda assim o **número do processo é obrigatório**
 
 ## 2. Resolução do processo
-Backend busca metadados do processo (demo: fixture; produção: DataJud API — capa e andamentos, não ementa).
+Backend busca metadados do processo. Caminho ao vivo: API pública DataJud (`/api/datajud/*` e tools MCP `abrir_datajud` / `buscar_datajud` / `comparar_datajud`). Caminho fixture: `POST /api/research` (`demo: true`). DataJud devolve capa e andamentos, não ementa.
 
 Extrai / registra:
 - tribunal, classe, assuntos

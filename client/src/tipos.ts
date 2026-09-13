@@ -74,6 +74,7 @@ export type AbaCaso =
   | "conversas"
   | "jurisprudencia"
   | "jurimetria"
+  | "prevencao"
   | "relatorios";
 
 export type TelaApp =
@@ -232,6 +233,52 @@ export type Jurisprudencia = {
   relacao?: RelacaoJuris;
 };
 
+export const POSICOES_CLIENTE = [
+  "consumidor",
+  "instituicao_financeira",
+] as const;
+
+export type PosicaoCliente = (typeof POSICOES_CLIENTE)[number];
+
+export const ROTULO_POSICAO_CLIENTE: Record<PosicaoCliente, string> = {
+  consumidor: "Consumidor",
+  instituicao_financeira: "Instituição financeira",
+};
+
+export type RelatorioPrevencao = {
+  id: string;
+  casoId: string;
+  contratoId: string;
+  contratoTitulo: string;
+  posicaoCliente: PosicaoCliente;
+  amostra: { total: number; fonte: "fixture" };
+  medidasPreProcessuais: string[];
+  honestidade: {
+    rotulo: "fixture/heuristica";
+    aviso: string;
+    jurimetriaAoVivo: false;
+    oraculo: false;
+  };
+  dissidioReport: {
+    narrative: string;
+    conflicts: {
+      chamber: string;
+      court: string;
+      orientationLabel: string;
+      vsProcessChamber: Alinhamento;
+      note: string;
+    }[];
+  };
+  chanceReport: {
+    score: number;
+    label: string;
+    rationale: string;
+    blindagem: string[];
+    fonte: FonteFato;
+  };
+  criadoEm: string;
+};
+
 export type Dissidio = {
   camara: string;
   orientacao: string;
@@ -273,9 +320,16 @@ export type Caso = {
   dissidios: Dissidio[];
   jurimetria: {
     amostra: number;
+    amostraAoVivo?: number;
+    amostraAcervo?: number;
     padrao: string;
     interno: string;
     riscos: string[];
+    honestidade?: {
+      live: "datajud_metadata";
+      acervo: "fixture" | "acervo_interno";
+      ementaOracle: false;
+    };
   };
   fontes?: ProvenienciaCaso;
 };

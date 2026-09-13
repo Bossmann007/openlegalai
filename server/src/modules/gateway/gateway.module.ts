@@ -1,4 +1,6 @@
+import { DataJudModule } from "@modules/datajud/datajud.module";
 import { JurisprudenceModule } from "@modules/jurisprudence/jurisprudence.module";
+import { PrevencaoModule } from "@modules/prevencao/prevencao.module";
 import { ProcessModule } from "@modules/process/process.module";
 import { ResearchModule } from "@modules/research/research.module";
 import { Module } from "@nestjs/common";
@@ -13,7 +15,13 @@ import { PolicyService } from "./policy.service";
 import { ToolCatalogService } from "./tool-catalog.service";
 
 @Module({
-  imports: [ProcessModule, JurisprudenceModule, ResearchModule],
+  imports: [
+    ProcessModule,
+    JurisprudenceModule,
+    ResearchModule,
+    PrevencaoModule,
+    DataJudModule,
+  ],
   controllers: [GatewayController],
   providers: [
     AuditService,

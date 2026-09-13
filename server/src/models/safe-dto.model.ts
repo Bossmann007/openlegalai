@@ -60,8 +60,9 @@ export type ItemConhecimento = {
   data: string | null;
   sentido: "restritivo" | "favoravel" | "indefinido";
   citavel: boolean;
-  /** Só preenchido quando a fonte é pública; caso contrário, null. */
+  /** Só preenchido quando a fonte é pública e a ementa oficial existe. */
   ementa: string | null;
+  fonte?: "datajud" | "acervo_interno" | "tjpr";
 };
 
 export type SafeKnowledgeResult = EnvelopeSafe<
@@ -102,8 +103,55 @@ export type SafeOfficeManifest = EnvelopeSafe<
   }
 >;
 
+export type SafePrevencaoSummary = EnvelopeSafe<
+  "prevencao_summary",
+  {
+    posicaoCliente: "consumidor" | "instituicao_financeira";
+    amostra: { total: number; fonte: "fixture" };
+    faixaDeRisco: "baixa" | "moderada" | "razoavel" | "indisponivel";
+    medidasPreProcessuais: string[];
+    honestidade: {
+      rotulo: "fixture/heuristica";
+      jurimetriaAoVivo: false;
+      oraculo: false;
+    };
+    /** Texto gerado. Sem título de contrato, parte ou CPF. */
+    sintese: string;
+  }
+>;
+
+export type SafeJurimetriaMista = EnvelopeSafe<
+  "jurimetria_mista",
+  {
+    referencia: string;
+    tribunal: string;
+    amostra: {
+      total: number;
+      aoVivo: number;
+      acervo: number;
+    };
+    honestidade: {
+      live: "datajud_metadata";
+      acervo: "fixture" | "acervo_interno";
+      ementaOracle: false;
+      oraculo: false;
+    };
+    divergenciaEntreOrgaos: {
+      alinhados: number;
+      divergentes: number;
+      contrarios: number;
+      semEmentaCitavel: number;
+    };
+    faixaDeRisco: "baixa" | "moderada" | "razoavel" | "indisponivel";
+    /** Texto gerado. Sem parte, CPF ou peça. */
+    sintese: string;
+  }
+>;
+
 export type QualquerSafeDTO =
   | SafeCaseSummary
   | SafeKnowledgeResult
   | SafeStrategicUpdate
-  | SafeOfficeManifest;
+  | SafeOfficeManifest
+  | SafePrevencaoSummary
+  | SafeJurimetriaMista;

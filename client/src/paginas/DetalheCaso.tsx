@@ -1,8 +1,10 @@
 import { ReactNode, useState } from "react";
+import { compararProcessoDataJud } from "../api";
 import { GavetaJuris } from "../componentes/GavetaJuris";
 import {
   IconeContrato,
   IconeConversa,
+  IconeEscudo,
   IconeGrafico,
   IconeHistorico,
   IconeJuris,
@@ -29,12 +31,14 @@ import {
 import { PainelAcervo } from "../componentes/PainelAcervo";
 import { PainelModelos } from "../componentes/PainelModelos";
 import { PainelPrazos } from "../componentes/PainelPrazos";
+import { PainelPrevencao } from "../componentes/PainelPrevencao";
 import { PainelRelatorios } from "../componentes/PainelRelatorios";
 import { AbaCaso, Caso, Jurisprudencia, ROTULO_STATUS } from "../tipos";
 
 type Props = {
   caso: Caso;
   onVoltar: () => void;
+  onCasoAtualizado?: (caso: Caso) => void;
 };
 
 type ItemMenu = {
@@ -58,14 +62,39 @@ const MENU: ItemMenu[] = [
   { id: "resultados", rotulo: "Resultados", grupo: "Estratégia", icone: <IconeResultado /> },
   { id: "jurisprudencia", rotulo: "Jurisprudência", grupo: "Estratégia", icone: <IconeJuris /> },
   { id: "jurimetria", rotulo: "Jurimetria", grupo: "Estratégia", icone: <IconeGrafico /> },
+  { id: "prevencao", rotulo: "Prevenção", grupo: "Estratégia", icone: <IconeEscudo /> },
   { id: "relatorios", rotulo: "Relatórios", grupo: "Estratégia", icone: <IconeRelatorio /> },
 ];
 
-export function DetalheCaso({ caso, onVoltar }: Props) {
+export function DetalheCaso({ caso, onVoltar, onCasoAtualizado }: Props) {
   const [aba, setAba] = useState<AbaCaso>("visao");
   const [juris, setJuris] = useState<Jurisprudencia | null>(null);
+  const [gerandoJurimetria, setGerandoJurimetria] = useState(false);
+  const [erroJurimetria, setErroJurimetria] = useState<string | null>(null);
 
   const grupos = ["Caso", "Acervo", "Estratégia"];
+
+  async function gerarJurimetria() {
+    if (!caso.processNumber.trim()) {
+      return;
+    }
+    setErroJurimetria(null);
+    setGerandoJurimetria(true);
+    try {
+      const atualizado = await compararProcessoDataJud(
+        caso.processNumber,
+        caso.court || "tjpr"
+      );
+      onCasoAtualizado?.(atualizado);
+      setAba("jurimetria");
+    } catch (falha: unknown) {
+      setErroJurimetria(
+        falha instanceof Error ? falha.message : "Não foi possível atualizar a jurimetria."
+      );
+    } finally {
+      setGerandoJurimetria(false);
+    }
+  }
 
   return (
     <section className="detalhe">
@@ -80,11 +109,31 @@ export function DetalheCaso({ caso, onVoltar }: Props) {
               {ROTULO_STATUS[caso.status]}
             </span>
             <span className="selo neutro">{caso.subtema}</span>
+            {caso.fontes?.jurimetria === "datajud" ? (
+              <span className="selo fonte-datajud">DataJud ao vivo</span>
+            ) : null}
           </div>
           <h2>{caso.titulo}</h2>
           <p>
             {caso.processNumber} · {caso.chamber}
           </p>
+          {caso.processNumber ? (
+            <div className="detalhe-acoes">
+              <button
+                className="botao-datajud secundario"
+                type="button"
+                disabled={gerandoJurimetria}
+                onClick={() => {
+                  void gerarJurimetria();
+                }}
+              >
+                {gerandoJurimetria
+                  ? "Atualizando jurimetria…"
+                  : "Gerar/atualizar jurimetria"}
+              </button>
+            </div>
+          ) : null}
+          {erroJurimetria ? <p className="detalhe-erro">{erroJurimetria}</p> : null}
         </div>
       </header>
 
@@ -167,6 +216,12 @@ export function DetalheCaso({ caso, onVoltar }: Props) {
             <PainelJurisprudencia caso={caso} onAbrir={setJuris} />
           )}
           {aba === "jurimetria" && <PainelJurimetria caso={caso} />}
+          {aba === "prevencao" && (
+            <PainelPrevencao
+              casoId={caso.id}
+              processNumber={caso.processNumber}
+            />
+          )}
           {aba === "relatorios" && <PainelRelatorios caso={caso} />}
         </div>
       </div>

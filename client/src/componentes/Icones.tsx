@@ -172,6 +172,15 @@ export function IconePrazo(props: Props) {
   );
 }
 
+export function IconeEscudo(props: Props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3l8 3v6c0 5-3.4 8.4-8 9.5C7.4 20.4 4 17 4 12V6l8-3z" />
+      <path d="M9 12l2 2 4-4" />
+    </Svg>
+  );
+}
+
 export function IconeRelatorio(props: Props) {
   return (
     <Svg {...props}>

@@ -1,6 +1,6 @@
 import { CASOS } from "./dados";
 import { hidratarPrazos } from "./prazos-escritorio";
-import { Caso, Documento, Mensagem } from "./tipos";
+import { Caso, Documento, Mensagem, PosicaoCliente, RelatorioPrevencao } from "./tipos";
 
 type ListaCasosResposta = {
   zone?: string;
@@ -203,6 +203,127 @@ export async function enviarMensagemChat(
     throw new Error("Resposta inválida do chat interno.");
   }
   return corpo.mensagem;
+}
+
+export type DataJudHit = {
+  tribunal: string;
+  tribunalAlias: string;
+  numeroProcesso: string;
+  classe: string;
+  assuntos: string[];
+  orgaoJulgador: string;
+  grau: string;
+  dataAjuizamento: string;
+  atualizacao: string;
+};
+
+export async function abrirProcessoDataJud(
+  numeroProcesso: string,
+  tribunal = "tjpr"
+): Promise<Caso> {
+  const resposta = await fetch(`${baseUrl()}/api/datajud/abrir`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ numeroProcesso, tribunal }),
+  });
+  if (!resposta.ok) {
+    throw new Error(await lerErro(resposta));
+  }
+  const corpo = (await resposta.json()) as CasoResposta & { live?: boolean; fonte?: string };
+  if (corpo.zone !== "internal" || !corpo.caso || corpo.fonte !== "datajud") {
+    throw new Error("Resposta inválida do DataJud ao vivo.");
+  }
+  return hidratarPrazos(corpo.caso);
+}
+
+export async function compararProcessoDataJud(
+  numeroProcesso: string,
+  tribunal = "tjpr"
+): Promise<Caso> {
+  const resposta = await fetch(`${baseUrl()}/api/datajud/comparar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ numeroProcesso, tribunal }),
+  });
+  if (!resposta.ok) {
+    throw new Error(await lerErro(resposta));
+  }
+  const corpo = (await resposta.json()) as CasoResposta & { live?: boolean; fonte?: string };
+  if (corpo.zone !== "internal" || !corpo.caso || corpo.fonte !== "datajud") {
+    throw new Error("Resposta inválida da comparação DataJud.");
+  }
+  return hidratarPrazos(corpo.caso);
+}
+
+export async function buscarDataJud(params: {
+  query?: string;
+  assunto?: string;
+  classe?: string;
+  tribunal?: string;
+}): Promise<{ tribunal: string; hits: DataJudHit[] }> {
+  const resposta = await fetch(`${baseUrl()}/api/datajud/buscar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query: params.query,
+      assunto: params.assunto,
+      classe: params.classe,
+      tribunal: params.tribunal || "tjpr",
+    }),
+  });
+  if (!resposta.ok) {
+    throw new Error(await lerErro(resposta));
+  }
+  const corpo = (await resposta.json()) as {
+    zone?: string;
+    fonte?: string;
+    tribunal?: string;
+    hits?: DataJudHit[];
+  };
+  if (corpo.zone !== "internal" || corpo.fonte !== "datajud" || !Array.isArray(corpo.hits)) {
+    throw new Error("Resposta inválida do DataJud ao vivo.");
+  }
+  return { tribunal: corpo.tribunal || "tjpr", hits: corpo.hits };
+}
+
+export async function listarPrevencao(casoId: string): Promise<RelatorioPrevencao[]> {
+  const resposta = await fetch(
+    `${baseUrl()}/api/prevencao?${new URLSearchParams({ casoId }).toString()}`
+  );
+  if (!resposta.ok) {
+    throw new Error(await lerErro(resposta));
+  }
+  const corpo = (await resposta.json()) as {
+    zone?: string;
+    relatorios?: RelatorioPrevencao[];
+  };
+  if (corpo.zone !== "internal" || !Array.isArray(corpo.relatorios)) {
+    throw new Error("Resposta inválida da análise preventiva.");
+  }
+  return corpo.relatorios;
+}
+
+export async function analisarPrevencao(
+  contratoId: string,
+  posicaoCliente: PosicaoCliente,
+  casoId: string
+): Promise<RelatorioPrevencao> {
+  const resposta = await fetch(`${baseUrl()}/api/prevencao/analisar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contratoId, posicaoCliente, casoId }),
+  });
+  if (!resposta.ok) {
+    throw new Error(await lerErro(resposta));
+  }
+  const corpo = (await resposta.json()) as {
+    zone?: string;
+    relatorio?: RelatorioPrevencao;
+  };
+  if (corpo.zone !== "internal" || !corpo.relatorio) {
+    throw new Error("Resposta inválida da análise preventiva.");
+  }
+  return corpo.relatorio;
 }
 
 /** A tela continua de pé com a cópia local, mas o motivo tem de ficar visível. */

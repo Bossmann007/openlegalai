@@ -1,7 +1,11 @@
-import { Rotulado, rotular } from "@models/classificacao.model";
+import { maiorSigilo, Rotulado, rotular, Sigilo } from "@models/classificacao.model";
 import { JurisprudenciaFixture } from "@models/jurisprudencia.model";
 import { ResultadoPesquisa } from "@models/pesquisa.model";
 import { Processo } from "@models/processo.model";
+import {
+  ComparacaoPublica,
+  DataJudService,
+} from "@modules/datajud/datajud.service";
 import { JurisprudenceService } from "@modules/jurisprudence/jurisprudence.service";
 import { ProcessService } from "@modules/process/process.service";
 import { ResearchService } from "@modules/research/research.service";
@@ -20,7 +24,8 @@ export class ClassificationService {
   constructor(
     private processService: ProcessService,
     private jurisprudenceService: JurisprudenceService,
-    private researchService: ResearchService
+    private researchService: ResearchService,
+    private dataJudService: DataJudService
   ) {}
 
   /** Capa de processo é dado de cliente, mesmo quando o número é público. */
@@ -81,4 +86,54 @@ export class ClassificationService {
       resultado.process.courtUnit,
     ].filter(Boolean);
   }
+
+  async capaDataJud(
+    numero: string,
+    tribunal?: string
+  ): Promise<Rotulado<Processo>> {
+    const capa = await this.dataJudService.capaPublica(numero, tribunal);
+    return rotular(capa, "publico", "datajud:capa");
+  }
+
+  async jurisprudenciaDataJud(params: {
+    query?: string;
+    assunto?: string;
+    classe?: string;
+    tribunal?: string;
+  }): Promise<Rotulado<JurisprudenciaFixture[]>> {
+    const itens = await this.dataJudService.precedentesAoVivoPublicos(params);
+    return rotular(itens, "publico", "datajud:metadados");
+  }
+
+  async comparacaoDataJud(
+    numero: string,
+    tribunal?: string
+  ): Promise<{
+    rotulado: Rotulado<ComparacaoPublica>;
+    textoSensivel: string[];
+    entidades: string[];
+  }> {
+    const comparacao = await this.dataJudService.comparacaoPublica(numero, tribunal);
+    const { textoSensivel, entidades, ...valor } = comparacao;
+    return {
+      rotulado: rotular(
+        valor,
+        sigiloComparacaoDataJud(textoSensivel, entidades),
+        "datajud:comparacao"
+      ),
+      textoSensivel,
+      entidades,
+    };
+  }
+}
+
+/** Acervo taint raises the IFC ceiling; never label PII-bearing objects as publico. */
+export function sigiloComparacaoDataJud(
+  textoSensivel: string[],
+  entidades: string[]
+): Sigilo {
+  if (textoSensivel.length > 0 || entidades.length > 0) {
+    return maiorSigilo(["publico", "cliente"]);
+  }
+  return "publico";
 }

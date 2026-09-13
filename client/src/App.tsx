@@ -68,6 +68,7 @@ export function App() {
             key={caso.id}
             caso={caso}
             onVoltar={() => setTela({ tipo: "casos" })}
+            onCasoAtualizado={setCaso}
           />
         )}
       </main>

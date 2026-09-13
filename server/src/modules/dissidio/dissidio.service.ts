@@ -15,6 +15,7 @@ import { Injectable } from "@nestjs/common";
 const ROTULO_ORIENTACAO = {
   rejeita_revisao: "Rejeita a revisão (linha contratualista)",
   aceita_revisao: "Aceita a revisão (afasta tarifa e/ou seguro)",
+  indeterminada: "Orientação indeterminada (DataJud só envia metadados)",
 };
 
 @Injectable()
@@ -58,12 +59,19 @@ export class DissidioService {
     const unknownCount = itens.filter((item) => item.alignment === "unknown")
       .length;
 
+    const aoVivo = itens.filter((item) => item.fonte === "datajud").length;
+    const acervo = itens.length - aoVivo;
+    const narrativaCapa =
+      processo.chamberOrientation === "indeterminada"
+        ? `A ${processo.chamber || "unidade"} do ${processo.court} entrou pela capa DataJud. Orientação da câmara indeterminada — metadados, não ementa.`
+        : `A ${processo.chamber} do ${processo.court} — câmara do processo do advogado — tem esta orientação predominante: ${ROTULO_ORIENTACAO[processo.chamberOrientation]}.`;
+
     const narrative = [
-      `A ${processo.chamber} do ${processo.court} — câmara do processo do advogado — tem esta orientação predominante: ${ROTULO_ORIENTACAO[processo.chamberOrientation]}.`,
-      `Foram cruzadas ${itens.length} jurisprudências. ${forCount} caminham com a câmara do caso, ${divergeCount} divergem de câmara e de resultado${unknownCount ? `, ${unknownCount} sem ementa citável` : ""}.`,
+      narrativaCapa,
+      `Foram cruzadas ${itens.length} jurisprudências (${aoVivo} DataJud ao vivo, ${acervo} acervo/fixture). ${forCount} caminham com a câmara do caso, ${divergeCount} divergem de câmara e de resultado${unknownCount ? `, ${unknownCount} sem ementa citável` : ""}.`,
       divergeCount > 0
-        ? "Há dissídio útil: outras câmaras do mesmo tribunal afastam tarifa e/ou seguro prestamista. Isso não muda sozinho o órgão do recurso, mas alimenta distinção e blindagem."
-        : "Não há dissídio de câmara nesta consulta.",
+        ? "Há dissídio útil no recorte do acervo. O lado DataJud é metadado (classe, assuntos, movimentos) e não oráculo de ementa."
+        : "Não há dissídio de câmara citável nesta consulta. Hits DataJud sem ementa ficam não citáveis.",
     ].join(" ");
 
     return { narrative, conflicts };
@@ -87,7 +95,12 @@ export class DissidioService {
     item: JurisprudenciaFixture,
     citeStatus: "ok" | "nao_citavel"
   ): Alinhamento {
-    if (citeStatus === "nao_citavel" || !item.orientation || !item.ementaSnippet) {
+    if (
+      citeStatus === "nao_citavel" ||
+      !item.orientation ||
+      !item.ementaSnippet ||
+      processo.chamberOrientation === "indeterminada"
+    ) {
       return "unknown";
     }
 
@@ -108,7 +121,9 @@ export class DissidioService {
 
   private notaLinha(processo: Processo, item: Jurisprudencia): string {
     if (item.alignment === "unknown") {
-      return "Ementa ausente na fixture — cite marcada como indisponível (cite-or-silent).";
+      return item.fonte === "datajud"
+        ? "Ementa ausente no DataJud — só metadados ao vivo (cite-or-silent)."
+        : "Ementa ausente no acervo/fixture — cite marcada como indisponível (cite-or-silent).";
     }
 
     if (item.alignment === "for") {
