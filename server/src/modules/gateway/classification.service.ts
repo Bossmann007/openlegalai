@@ -1,4 +1,4 @@
-import { Rotulado, rotular } from "@models/classificacao.model";
+import { maiorSigilo, Rotulado, rotular, Sigilo } from "@models/classificacao.model";
 import { JurisprudenciaFixture } from "@models/jurisprudencia.model";
 import { ResultadoPesquisa } from "@models/pesquisa.model";
 import { Processo } from "@models/processo.model";
@@ -108,8 +108,32 @@ export class ClassificationService {
   async comparacaoDataJud(
     numero: string,
     tribunal?: string
-  ): Promise<Rotulado<ComparacaoPublica>> {
+  ): Promise<{
+    rotulado: Rotulado<ComparacaoPublica>;
+    textoSensivel: string[];
+    entidades: string[];
+  }> {
     const comparacao = await this.dataJudService.comparacaoPublica(numero, tribunal);
-    return rotular(comparacao, "publico", "datajud:comparacao");
+    const { textoSensivel, entidades, ...valor } = comparacao;
+    return {
+      rotulado: rotular(
+        valor,
+        sigiloComparacaoDataJud(textoSensivel, entidades),
+        "datajud:comparacao"
+      ),
+      textoSensivel,
+      entidades,
+    };
   }
+}
+
+/** Acervo taint raises the IFC ceiling; never label PII-bearing objects as publico. */
+export function sigiloComparacaoDataJud(
+  textoSensivel: string[],
+  entidades: string[]
+): Sigilo {
+  if (textoSensivel.length > 0 || entidades.length > 0) {
+    return maiorSigilo(["publico", "cliente"]);
+  }
+  return "publico";
 }

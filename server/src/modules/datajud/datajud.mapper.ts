@@ -1,5 +1,6 @@
 import { aplicarPoliticaCaso } from "@common/security/caso-policy";
-import { CHANCE_INDISPONIVEL } from "@common/security/fonte-fato";
+import { ementaCitavel } from "@common/security/cite-or-silent";
+import { CHANCE_INDISPONIVEL, FonteFato } from "@common/security/fonte-fato";
 import {
   Andamento,
   Caso,
@@ -48,7 +49,7 @@ export function hitDeSource(
   const numero = formatarCnj(
     texto(source.numeroProcesso) || texto(source.numero_processo)
   );
-  if (!cnjDigitos(numero) && !numero) {
+  if (cnjDigitos(numero).length !== 20) {
     return null;
   }
 
@@ -118,11 +119,102 @@ export function fixtureDeHit(hit: DataJudHit, indice: number): JurisprudenciaFix
   };
 }
 
-export function casoJurisDeClassificada(
-  item: JurisClassificada,
-  fonte: "datajud" | "acervo_interno"
-): Jurisprudencia {
-  const ementa = fonte === "datajud" ? "" : item.ementaSnippet || "";
+export function fonteCasoDeClassificada(
+  fonte: FonteFato | undefined
+): "datajud" | "tjpr" | "acervo_interno" {
+  switch (fonte) {
+    case "datajud":
+    case "tjpr":
+      return fonte;
+    case "acervo_interno":
+    case "inferencia":
+    case "indisponivel":
+    case undefined:
+      return "acervo_interno";
+    default: {
+      const neverFonte: never = fonte;
+      return neverFonte;
+    }
+  }
+}
+
+export function fixtureDeCasoJuris(item: Jurisprudencia): JurisprudenciaFixture {
+  return {
+    id: item.id,
+    processNumber: item.processNumber,
+    acordaoNumber: item.acordao || null,
+    court: item.court,
+    chamber: item.chamber,
+    organ: item.chamber,
+    reporter: item.reporter || null,
+    district: null,
+    caseClass: "",
+    subjects: item.pontos || [],
+    judgmentDate: item.date || null,
+    publicationDate: item.date || null,
+    decisionType: "",
+    ementaSnippet: item.ementa || null,
+    voteSummary: item.essencial?.resumo || null,
+    orientation: null,
+    relatedSubjects: item.pontos || [],
+    citavel: item.citavel,
+    fonte: item.fonte,
+  };
+}
+
+export function mesclarAcervo(
+  casoJuris: Jurisprudencia[],
+  fixtures: JurisprudenciaFixture[]
+): JurisprudenciaFixture[] {
+  const vistos = new Set<string>();
+  const saida: JurisprudenciaFixture[] = [];
+
+  for (const item of casoJuris) {
+    const fixture = carimbarFixture(fixtureDeCasoJuris(item));
+    const chave = cnjDigitos(fixture.processNumber) || fixture.id;
+    if (vistos.has(chave)) {
+      continue;
+    }
+    vistos.add(chave);
+    saida.push(fixture);
+  }
+
+  for (const item of fixtures) {
+    const chave = cnjDigitos(item.processNumber) || item.id;
+    if (vistos.has(chave)) {
+      continue;
+    }
+    vistos.add(chave);
+    saida.push(carimbarFixture(item));
+  }
+
+  return saida;
+}
+
+export function precedentesDeHits(
+  hits: DataJudHit[],
+  capaCnj: string
+): JurisprudenciaFixture[] {
+  const alvo = cnjDigitos(capaCnj);
+  const vistos = new Set<string>();
+  const fixtures: JurisprudenciaFixture[] = [];
+
+  for (const [indice, item] of hits.entries()) {
+    const chave = cnjDigitos(item.numeroProcesso);
+    if (!chave || vistos.has(chave) || chave === alvo) {
+      continue;
+    }
+    vistos.add(chave);
+    fixtures.push(fixtureDeHit(item, indice));
+  }
+
+  return fixtures.slice(0, 8);
+}
+
+export function casoJurisDeClassificada(item: JurisClassificada): Jurisprudencia {
+  const fonte = fonteCasoDeClassificada(item.fonte);
+  const citavel = fonte !== "datajud" && ementaCitavel(item);
+  const ementa = citavel ? item.ementaSnippet || "" : "";
   const resumo =
     fonte === "datajud"
       ? "Metadados DataJud ao vivo. Sem ementa. Não cite como acórdão."
@@ -147,7 +239,7 @@ export function casoJurisDeClassificada(
     fortalecer: BLOCO_VAZIO,
     blindar: BLOCO_VAZIO,
     contrapor: BLOCO_VAZIO,
-    citavel: false,
+    citavel,
     fonte,
     relacao: "precedente_tema",
   };

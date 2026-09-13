@@ -1,5 +1,6 @@
 import { Identidade } from "@models/gateway.model";
 import { EnvelopeSafe } from "@models/safe-dto.model";
+import { DATAJUD_LIMITE } from "@modules/datajud/datajud.limites";
 import { Injectable } from "@nestjs/common";
 import { z } from "zod";
 import { PrevencaoService } from "@modules/prevencao/prevencao.service";
@@ -220,9 +221,12 @@ export class ToolCatalogService {
         esquema: z.object({
           processNumber: z
             .string()
+            .min(DATAJUD_LIMITE.cnjMin)
+            .max(DATAJUD_LIMITE.cnjMax)
             .describe("Número CNJ: 0000000-00.0000.0.00.0000"),
           tribunal: z
             .string()
+            .max(DATAJUD_LIMITE.tribunal)
             .optional()
             .describe("Alias do índice DataJud. Padrão tjpr."),
         }),
@@ -241,10 +245,26 @@ export class ToolCatalogService {
         descricao:
           "Busca processos na API pública do CNJ por assunto, classe ou texto. Cada hit volta com fonte=datajud e citavel=false quando não há ementa oficial. Sem PII.",
         esquema: z.object({
-          query: z.string().optional().describe("Texto livre sobre assunto ou classe"),
-          assunto: z.string().optional().describe("Assunto catalogado, ex. Alienação Fiduciária"),
-          classe: z.string().optional().describe("Classe processual"),
-          tribunal: z.string().optional().describe("Alias DataJud, padrão tjpr"),
+          query: z
+            .string()
+            .max(DATAJUD_LIMITE.busca)
+            .optional()
+            .describe("Texto livre sobre assunto ou classe"),
+          assunto: z
+            .string()
+            .max(DATAJUD_LIMITE.busca)
+            .optional()
+            .describe("Assunto catalogado, ex. Alienação Fiduciária"),
+          classe: z
+            .string()
+            .max(DATAJUD_LIMITE.busca)
+            .optional()
+            .describe("Classe processual"),
+          tribunal: z
+            .string()
+            .max(DATAJUD_LIMITE.tribunal)
+            .optional()
+            .describe("Alias DataJud, padrão tjpr"),
         }),
         somenteLeitura: true,
         executar: async (argumentos) => {
@@ -270,19 +290,26 @@ export class ToolCatalogService {
         esquema: z.object({
           processNumber: z
             .string()
+            .min(DATAJUD_LIMITE.cnjMin)
+            .max(DATAJUD_LIMITE.cnjMax)
             .describe("Número CNJ do processo a comparar"),
-          tribunal: z.string().optional().describe("Alias DataJud, padrão tjpr"),
+          tribunal: z
+            .string()
+            .max(DATAJUD_LIMITE.tribunal)
+            .optional()
+            .describe("Alias DataJud, padrão tjpr"),
         }),
         somenteLeitura: true,
         executar: async (argumentos) => {
-          const comparacao = await this.classificationService.comparacaoDataJud(
-            String(argumentos.processNumber),
-            typeof argumentos.tribunal === "string" ? argumentos.tribunal : undefined
-          );
+          const { rotulado, textoSensivel, entidades } =
+            await this.classificationService.comparacaoDataJud(
+              String(argumentos.processNumber),
+              typeof argumentos.tribunal === "string" ? argumentos.tribunal : undefined
+            );
           return this.declassifyService.jurimetriaMista(
-            comparacao,
-            comparacao.valor.textoSensivel,
-            comparacao.valor.entidades
+            rotulado,
+            textoSensivel,
+            entidades
           );
         },
       },

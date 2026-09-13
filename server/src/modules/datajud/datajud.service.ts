@@ -3,7 +3,6 @@ import { Jurisprudencia, JurisprudenciaFixture } from "@models/jurisprudencia.mo
 import { RelatorioChance, RelatorioDissidio } from "@models/pesquisa.model";
 import { Processo } from "@models/processo.model";
 import { CasosService } from "@modules/casos/casos.service";
-import { cnjDigitos } from "@modules/casos/caso.assembler";
 import { DissidioService } from "@modules/dissidio/dissidio.service";
 import { JurisprudenceService } from "@modules/jurisprudence/jurisprudence.service";
 import { ProcessService } from "@modules/process/process.service";
@@ -12,13 +11,14 @@ import { DataJudClient } from "./datajud.client";
 import { erroInvalido, erroVazio } from "./datajud.errors";
 import {
   amostraDe,
-  carimbarFixture,
   casoJurisDeClassificada,
   dissidiosDeRelatorio,
   fixtureDeHit,
   jurimetriaMista,
+  mesclarAcervo,
   montarCasoLive,
   orientacaoCapa,
+  precedentesDeHits,
   processoDeHit,
 } from "./datajud.mapper";
 import { AmostraMista, DataJudHit } from "./datajud.types";
@@ -29,6 +29,9 @@ export type ComparacaoPublica = {
   amostra: AmostraMista;
   dissidio: RelatorioDissidio;
   chance: RelatorioChance;
+};
+
+export type ComparacaoComTaint = ComparacaoPublica & {
   textoSensivel: string[];
   entidades: string[];
 };
@@ -112,7 +115,7 @@ export class DataJudService {
   async comparacaoPublica(
     numeroProcesso: string,
     tribunal?: string
-  ): Promise<ComparacaoPublica> {
+  ): Promise<ComparacaoComTaint> {
     const numero = this.processService.normalizarNumero(numeroProcesso);
     if (!this.processService.numeroValido(numero)) {
       throw erroInvalido(
@@ -132,9 +135,7 @@ export class DataJudService {
     capa.parties = [];
     const assuntos = this.assuntosComparacao(hit, base, capa);
     const liveFixtures = await this.precedentesAoVivo(assuntos, alias, hit);
-    const acervoFixtures = this.jurisprudenceService
-      .buscarRelacionadas(assuntos)
-      .map(carimbarFixture);
+    const acervoFixtures = this.acervoParaComparacao(base, assuntos);
     const classificadas = this.dissidioService.classificar(capa, [
       ...acervoFixtures,
       ...liveFixtures,
@@ -187,21 +188,14 @@ export class DataJudService {
     const assuntos = this.assuntosComparacao(hit, base, capa);
 
     const liveFixtures = await this.precedentesAoVivo(assuntos, alias, hit);
-    const acervoFixtures = this.jurisprudenceService
-      .buscarRelacionadas(assuntos)
-      .map(carimbarFixture);
+    const acervoFixtures = this.acervoParaComparacao(base, assuntos);
 
     const merged: JurisprudenciaFixture[] = [...acervoFixtures, ...liveFixtures];
     const classificadas = this.dissidioService.classificar(capa, merged);
     const dissidio = this.dissidioService.montarRelatorioDissidio(capa, classificadas);
     const chance = this.dissidioService.montarRelatorioChance(capa, classificadas);
 
-    const juris = classificadas.map((item) =>
-      casoJurisDeClassificada(
-        item,
-        item.fonte === "datajud" ? "datajud" : "acervo_interno"
-      )
-    );
+    const juris = classificadas.map((item) => casoJurisDeClassificada(item));
 
     const amostra = amostraDe(
       liveFixtures.length,
@@ -253,6 +247,16 @@ export class DataJudService {
     return [...new Set(juntos)];
   }
 
+  private acervoParaComparacao(
+    base: Caso | undefined,
+    assuntos: string[]
+  ): JurisprudenciaFixture[] {
+    return mesclarAcervo(
+      base?.jurisprudencias || [],
+      this.jurisprudenceService.buscarRelacionadas(assuntos)
+    );
+  }
+
   private async precedentesAoVivo(
     assuntos: string[],
     alias: string,
@@ -260,7 +264,7 @@ export class DataJudService {
   ): Promise<JurisprudenciaFixture[]> {
     const termo = assuntos[0] || capa.classe;
     if (!termo) {
-      return [fixtureDeHit(capa, 0)];
+      return [];
     }
 
     try {
@@ -269,33 +273,14 @@ export class DataJudService {
         query: termo,
         tribunal: alias,
       });
-      const vistos = new Set<string>();
-      const fixtures: JurisprudenciaFixture[] = [];
-
-      for (const [indice, item] of hits.entries()) {
-        const chave = cnjDigitos(item.numeroProcesso) || `${indice}`;
-        if (vistos.has(chave)) {
-          continue;
-        }
-        if (chave && chave === cnjDigitos(capa.numeroProcesso)) {
-          continue;
-        }
-        vistos.add(chave);
-        fixtures.push(fixtureDeHit(item, indice));
-      }
-
-      if (!fixtures.length) {
-        fixtures.push(fixtureDeHit(capa, 0));
-      }
-
-      return fixtures.slice(0, 8);
+      return precedentesDeHits(hits, capa.numeroProcesso);
     } catch (erro) {
       this.logger.warn(
         `Busca de precedentes DataJud falhou após a capa ao vivo: ${
           erro instanceof Error ? erro.message : String(erro)
         }`
       );
-      return [fixtureDeHit(capa, 0)];
+      return [];
     }
   }
 }

@@ -3,21 +3,30 @@ import { aplicarPoliticaCaso } from "../src/common/security/caso-policy";
 import { ementaCitavel, ementaParaCitacao } from "../src/common/security/cite-or-silent";
 import { CHANCE_INDISPONIVEL } from "../src/common/security/fonte-fato";
 import { Caso } from "../src/models/caso.model";
+import { sigiloComparacaoDataJud } from "../src/modules/gateway/classification.service";
 import { DlpService } from "../src/modules/gateway/dlp.service";
 import { DeclassifyService } from "../src/modules/gateway/declassify.service";
 import { PolicyService } from "../src/modules/gateway/policy.service";
 import { DataJudClient } from "../src/modules/datajud/datajud.client";
 import { DataJudException } from "../src/modules/datajud/datajud.errors";
+import { DATAJUD_LIMITE } from "../src/modules/datajud/datajud.limites";
 import {
+  casoJurisDeClassificada,
+  fixtureDeCasoJuris,
   fixtureDeHit,
   hitDeSource,
+  mesclarAcervo,
+  precedentesDeHits,
   processoDeHit,
   tribunalAlias,
 } from "../src/modules/datajud/datajud.mapper";
-import { ComparacaoPublica } from "../src/modules/datajud/datajud.service";
+import { ComparacaoComTaint, DataJudService } from "../src/modules/datajud/datajud.service";
 import { DissidioService } from "../src/modules/dissidio/dissidio.service";
 import { JurisprudenceService } from "../src/modules/jurisprudence/jurisprudence.service";
+import { CasosService } from "../src/modules/casos/casos.service";
+import { ProcessService } from "../src/modules/process/process.service";
 import { rotular } from "../src/models/classificacao.model";
+import { z } from "zod";
 
 const SOURCE_COM_PII = {
   numeroProcesso: "00001065620148160193",
@@ -116,6 +125,20 @@ describe("DataJud mapper", () => {
     expect(tribunalAlias("api_publica_tjpr")).toBe("tjpr");
     expect(tribunalAlias("***")).toBe("tjpr");
   });
+
+  it("rejeita hit cujo CNJ não tem 20 dígitos", () => {
+    expect(hitDeSource({ ...SOURCE_COM_PII, numeroProcesso: "123" }, "tjpr")).toBeNull();
+    expect(hitDeSource({ ...SOURCE_COM_PII, numeroProcesso: "" }, "tjpr")).toBeNull();
+    expect(
+      hitDeSource({ ...SOURCE_COM_PII, numeroProcesso: "0000106-56.2014.8.16.019" }, "tjpr")
+    ).toBeNull();
+  });
+
+  it("não substitui a capa como precedente quando a busca relacionada vem vazia", () => {
+    const capa = hitDeSource(SOURCE_COM_PII, "tjpr")!;
+    expect(precedentesDeHits([], capa.numeroProcesso)).toEqual([]);
+    expect(precedentesDeHits([capa], capa.numeroProcesso)).toEqual([]);
+  });
 });
 
 describe("DataJud client", () => {
@@ -203,6 +226,84 @@ describe("comparação mista e cite-or-silent", () => {
     expect(limpo.jurisprudencias[0].ementa).toBe("");
     expect(limpo.fontes.jurimetria).toBe("datajud");
   });
+
+  it("mescla jurisprudências do acervo e preserva fonte/citavel", () => {
+    const acervoTjpr = {
+      id: "juris-tjpr-acervo",
+      processNumber: "0001234-56.2020.8.16.0001",
+      acordao: "0001234-56.2020.8.16.0001",
+      court: "TJPR",
+      chamber: "12ª Câmara Cível",
+      reporter: "Des. Exemplo",
+      date: "2020-05-10",
+      status: "ATIVO" as const,
+      alignment: "unknown" as const,
+      ementa: "Ementa oficial do acórdão publicado pelo TJPR sobre alienação fiduciária.",
+      pontos: ["Alienação Fiduciária"],
+      essencial: { resumo: "Ementa oficial", itens: ["Alienação Fiduciária"] },
+      fortalecer: { resumo: "", itens: [] },
+      blindar: { resumo: "", itens: [] },
+      contrapor: { resumo: "", itens: [] },
+      citavel: true,
+      fonte: "tjpr" as const,
+    };
+    const fixture = fixtureDeCasoJuris(acervoTjpr);
+    expect(fixture.fonte).toBe("tjpr");
+    expect(fixture.citavel).toBe(true);
+    expect(ementaCitavel(fixture)).toBe(true);
+
+    const mesclado = mesclarAcervo(
+      [acervoTjpr],
+      new JurisprudenceService().buscarRelacionadas(["Contratos bancários"])
+    );
+    const doAcervo = mesclado.find((item) => item.id === "juris-tjpr-acervo");
+    expect(doAcervo?.fonte).toBe("tjpr");
+    expect(doAcervo?.citavel).toBe(true);
+    expect(mesclado.length).toBeGreaterThan(1);
+
+    const mapped = casoJurisDeClassificada({
+      ...fixture,
+      alignment: "unknown",
+      citeStatus: "ok",
+    });
+    expect(mapped.fonte).toBe("tjpr");
+    expect(mapped.citavel).toBe(true);
+    expect(mapped.ementa).toContain("Ementa oficial");
+  });
+
+  it("falha da busca relacionada devolve set ao vivo vazio — zero hits falsos", async () => {
+    const hit = hitDeSource(SOURCE_COM_PII, "tjpr")!;
+    const servico = new DataJudService(
+      {
+        alias: () => "tjpr",
+        buscarPorCnj: async () => [hit],
+        buscar: async () => {
+          throw new Error("related search down");
+        },
+      } as unknown as DataJudClient,
+      {
+        obterDoAcervo: async () => undefined,
+      } as unknown as CasosService,
+      {
+        normalizarNumero: (numero: string) => numero,
+        numeroValido: () => true,
+        buscarCapa: () => {
+          throw new Error("no fixture");
+        },
+      } as unknown as ProcessService,
+      new JurisprudenceService(),
+      new DissidioService()
+    );
+
+    const comparacao = await servico.comparacaoPublica(hit.numeroProcesso, "tjpr");
+    expect(comparacao.amostra.aoVivo).toBe(0);
+    expect(comparacao.classificadas.filter((item) => item.fonte === "datajud")).toEqual([]);
+    expect(
+      comparacao.classificadas.some(
+        (item) => item.processNumber === hit.numeroProcesso && item.fonte === "datajud"
+      )
+    ).toBe(false);
+  });
 });
 
 describe("SafeDTO DataJud", () => {
@@ -211,7 +312,7 @@ describe("SafeDTO DataJud", () => {
   it("jurimetria mista não vaza CPF, parte nem peça e não é oráculo", () => {
     const hit = hitDeSource(SOURCE_COM_PII, "tjpr")!;
     const caso = casoMinimo();
-    const comparacao: ComparacaoPublica = {
+    const comparacao: ComparacaoComTaint = {
       processo: { ...processoDeHit(hit), parties: [] },
       classificadas: [
         {
@@ -242,14 +343,21 @@ describe("SafeDTO DataJud", () => {
       entidades: ["Maria Souza"],
     };
 
+    const { textoSensivel, entidades, ...valor } = comparacao;
+    const sigilo = sigiloComparacaoDataJud(textoSensivel, entidades);
+    expect(sigilo).toBe("cliente");
+    expect("textoSensivel" in valor).toBe(false);
+    expect("entidades" in valor).toBe(false);
+
     const dto = declassify.jurimetriaMista(
-      rotular(comparacao, "publico", "datajud:comparacao"),
-      comparacao.textoSensivel,
-      comparacao.entidades
+      rotular(valor, sigilo, "datajud:comparacao"),
+      textoSensivel,
+      entidades
     );
     const corpo = JSON.stringify(dto);
 
     expect(dto.tipo).toBe("jurimetria_mista");
+    expect(dto.declassificacao.sigiloOrigem).toBe("cliente");
     expect(dto.conteudo.amostra).toEqual({ total: 3, aoVivo: 1, acervo: 2 });
     expect(dto.conteudo.honestidade.ementaOracle).toBe(false);
     expect(dto.conteudo.honestidade.oraculo).toBe(false);
@@ -258,6 +366,23 @@ describe("SafeDTO DataJud", () => {
     expect(corpo).not.toContain("390.533.447-05");
     expect(corpo).not.toContain("petição inicial");
     expect(new DlpService().detectar(dto)).toEqual([]);
+  });
+
+  it("comparação sem taint de acervo permanece pública", () => {
+    expect(sigiloComparacaoDataJud([], [])).toBe("publico");
+    expect(sigiloComparacaoDataJud(["peça do cliente"], [])).toBe("cliente");
+  });
+
+  it("esquemas MCP espelham os tetos HTTP de CNJ, tribunal e busca", () => {
+    const cnj = z.string().min(DATAJUD_LIMITE.cnjMin).max(DATAJUD_LIMITE.cnjMax);
+    const tribunal = z.string().max(DATAJUD_LIMITE.tribunal);
+    const busca = z.string().max(DATAJUD_LIMITE.busca);
+
+    expect(DATAJUD_LIMITE).toEqual({ cnjMin: 15, cnjMax: 40, tribunal: 20, busca: 200 });
+    expect(cnj.safeParse("0000106-56.2014.8.16.0193").success).toBe(true);
+    expect(cnj.safeParse("123").success).toBe(false);
+    expect(tribunal.safeParse("x".repeat(21)).success).toBe(false);
+    expect(busca.safeParse("x".repeat(201)).success).toBe(false);
   });
 
   it("conhecimento DataJud sai sem ementa", () => {
