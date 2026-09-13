@@ -3,6 +3,7 @@ import {
   abrirProcessoDataJud,
   buscarDataJud,
   DataJudHit,
+  DataJudOrigemApi,
   listarCasos,
 } from "../api";
 import { CartaoCaso } from "../componentes/CartaoCaso";
@@ -24,6 +25,7 @@ export function ListaCasos({ onAbrir }: Props) {
   const [tribunal, setTribunal] = useState("tjpr");
   const [termoDataJud, setTermoDataJud] = useState("");
   const [hits, setHits] = useState<DataJudHit[]>([]);
+  const [origemDataJud, setOrigemDataJud] = useState<DataJudOrigemApi | null>(null);
   const [erroDataJud, setErroDataJud] = useState<string | null>(null);
   const [carregandoDataJud, setCarregandoDataJud] = useState<"abrir" | "buscar" | null>(
     null
@@ -85,7 +87,8 @@ export function ListaCasos({ onAbrir }: Props) {
     setErroDataJud(null);
     setCarregandoDataJud("abrir");
     try {
-      const caso = await abrirProcessoDataJud(cnj, tribunal.trim() || "tjpr");
+      const { caso, origem } = await abrirProcessoDataJud(cnj, tribunal.trim() || "tjpr");
+      setOrigemDataJud(origem);
       onAbrir(caso.id);
     } catch (falha: unknown) {
       setErroDataJud(
@@ -108,9 +111,10 @@ export function ListaCasos({ onAbrir }: Props) {
         tribunal: tribunal.trim() || "tjpr",
       });
       setHits(resultado.hits);
+      setOrigemDataJud(resultado.origem);
       if (!resultado.hits.length) {
         setErroDataJud(
-          `Nenhum metadado ao vivo no ${resultado.tribunal.toUpperCase()} para esse recorte. Nada foi inventado.`
+          `Nenhum metadado no ${resultado.tribunal.toUpperCase()} para esse recorte. Nada foi inventado.`
         );
       }
     } catch (falha: unknown) {
@@ -127,10 +131,11 @@ export function ListaCasos({ onAbrir }: Props) {
     setErroDataJud(null);
     setCarregandoDataJud("abrir");
     try {
-      const caso = await abrirProcessoDataJud(
+      const { caso, origem } = await abrirProcessoDataJud(
         hit.numeroProcesso,
         hit.tribunalAlias || tribunal
       );
+      setOrigemDataJud(origem);
       onAbrir(caso.id);
     } catch (falha: unknown) {
       setErroDataJud(
@@ -151,19 +156,25 @@ export function ListaCasos({ onAbrir }: Props) {
         </p>
       </div>
 
-      <section className="datajud-painel" aria-label="DataJud ao vivo">
+      <section className="datajud-painel" aria-label="DataJud">
         <div className="datajud-cabeca">
           <p className="olho">Fonte oficial CNJ</p>
           <div className="selos">
-            <span className="selo fonte-datajud">Ao vivo</span>
+            <SeloOrigemDataJud origem={origemDataJud} />
             <span className="selo neutro">{tribunal.toUpperCase()}</span>
           </div>
         </div>
-        <h3>Metadados DataJud ao vivo</h3>
+        <h3>Metadados DataJud</h3>
         <p>
-          Consulta a API pública do CNJ. Devolve classe, assuntos e movimentos —
-          não ementa completa nem jurimetria oráculo.
+          Consulta a API pública do CNJ. Se a API limitar ou cair, a tela usa
+          replay local e avisa. Devolve classe, assuntos e movimentos — não
+          ementa completa nem jurimetria oráculo.
         </p>
+        {origemDataJud?.fonte === "datajud_captura" ? (
+          <p className="datajud-banner-captura">
+            fonte: datajud_captura · captura oficial (replay)
+          </p>
+        ) : null}
 
         <form className="datajud-formas" onSubmit={abrirCnj}>
           <label className="busca">
@@ -217,7 +228,7 @@ export function ListaCasos({ onAbrir }: Props) {
         ) : null}
 
         {carregandoDataJud === "buscar" ? (
-          <Carregando texto="Buscando metadados DataJud ao vivo." />
+          <Carregando texto="Buscando metadados DataJud." />
         ) : null}
 
         {hits.length > 0 ? (
@@ -226,7 +237,7 @@ export function ListaCasos({ onAbrir }: Props) {
               <li key={`${hit.tribunalAlias}-${hit.numeroProcesso}`}>
                 <button type="button" onClick={() => abrirHit(hit)}>
                   <div className="selos">
-                    <span className="selo fonte-datajud">Ao vivo</span>
+                    <SeloOrigemDataJud origem={origemDataJud} />
                     <span className="selo neutro">{hit.tribunal}</span>
                   </div>
                   <strong>{hit.numeroProcesso || "Sem número"}</strong>
@@ -300,4 +311,18 @@ export function ListaCasos({ onAbrir }: Props) {
       )}
     </section>
   );
+}
+
+function SeloOrigemDataJud({ origem }: { origem: DataJudOrigemApi | null }) {
+  if (!origem) {
+    return <span className="selo neutro">auto / live / cache</span>;
+  }
+  if (origem.fonte === "datajud_captura") {
+    return (
+      <span className="selo fonte-datajud-captura" title="fonte: datajud_captura">
+        fonte: datajud_captura
+      </span>
+    );
+  }
+  return <span className="selo fonte-datajud">{origem.rotulo}</span>;
 }

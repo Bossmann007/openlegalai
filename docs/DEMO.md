@@ -10,7 +10,10 @@ Pitch: a IA do cliente entra pelo MCP. O escritório é memória + porta fail-cl
 ```sh
 DATAJUD_API_KEY=
 DATAJUD_DEFAULT_TRIBUNAL=tjpr
+DATAJUD_MODE=auto
 ```
+
+`auto` tenta a API pública e, em 429/rede/timeout, lê `server/src/fixtures/datajud-cache/` com o rótulo `fonte: datajud_captura`. Roteiro do advogado + ChatGPT: [DEMO-ADVOGADO-CHATGPT.md](DEMO-ADVOGADO-CHATGPT.md).
 
 3. Suba o Nest e a tela:
 

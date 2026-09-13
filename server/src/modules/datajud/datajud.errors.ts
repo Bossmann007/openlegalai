@@ -53,3 +53,11 @@ export function erroVazio(numero: string, tribunal: string): DataJudException {
 export function erroInvalido(mensagem: string): DataJudException {
   return new DataJudException("invalido", mensagem, HttpStatus.BAD_REQUEST);
 }
+
+export function erroCacheMiss(recorte: string): DataJudException {
+  return new DataJudException(
+    "cache_miss",
+    `Sem captura local para ${recorte}. Nada foi inventado.`,
+    HttpStatus.NOT_FOUND
+  );
+}

@@ -231,7 +231,9 @@ export function PainelJurimetria({ caso }: { caso: Caso }) {
   const amostraValida = caso.jurimetria.amostra > 0;
   const aoVivo = caso.jurimetria.amostraAoVivo || 0;
   const acervo = caso.jurimetria.amostraAcervo || 0;
+  const captura = caso.jurimetria.honestidade?.live === "datajud_captura";
   const mista = aoVivo > 0 || Boolean(caso.jurimetria.honestidade);
+  const ladoDataJud = captura ? "captura oficial (replay)" : "DataJud ao vivo";
   const porAlinhamento = {
     for: caso.jurisprudencias.filter((item) => item.alignment === "for" && item.ementa),
     against: caso.jurisprudencias.filter((item) => item.alignment === "against" && item.ementa),
@@ -244,7 +246,7 @@ export function PainelJurimetria({ caso }: { caso: Caso }) {
         <h3>Jurimetria</h3>
         <p>
           {mista
-            ? `Amostra descritiva: ${aoVivo} DataJud ao vivo + ${acervo} acervo/fixture (${caso.jurimetria.amostra} no total).`
+            ? `Amostra descritiva: ${aoVivo} ${ladoDataJud} + ${acervo} acervo/fixture (${caso.jurimetria.amostra} no total).`
             : amostraValida
               ? `${caso.jurimetria.amostra} acórdãos oficiais neste recorte.`
               : "Leitura das ementas oficiais deste caso."}
@@ -256,8 +258,9 @@ export function PainelJurimetria({ caso }: { caso: Caso }) {
         <article className="cartao-suave datajud-aviso">
           <p className="olho">Honestidade</p>
           <p>
-            O lado ao vivo é metadado DataJud (classe, assuntos, movimentos).
-            Não é ementa completa, nem garantia de vitória, nem oráculo.
+            {captura
+              ? "fonte: datajud_captura. Replay local de metadados oficiais (classe, assuntos, movimentos). Não é sessão ao vivo, nem ementa completa, nem oráculo."
+              : "O lado ao vivo é metadado DataJud (classe, assuntos, movimentos). Não é ementa completa, nem garantia de vitória, nem oráculo."}
           </p>
         </article>
       ) : null}

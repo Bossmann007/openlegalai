@@ -217,10 +217,38 @@ export type DataJudHit = {
   atualizacao: string;
 };
 
+export type DataJudOrigemApi = {
+  live: boolean;
+  fonte: "datajud" | "datajud_captura";
+  rotulo: string;
+};
+
+function origemDataJud(corpo: {
+  live?: boolean;
+  fonte?: string;
+  rotulo?: string;
+}): DataJudOrigemApi | null {
+  if (corpo.fonte === "datajud_captura") {
+    return {
+      live: false,
+      fonte: "datajud_captura",
+      rotulo: corpo.rotulo || "captura oficial (replay)",
+    };
+  }
+  if (corpo.fonte === "datajud") {
+    return {
+      live: corpo.live !== false,
+      fonte: "datajud",
+      rotulo: corpo.rotulo || "metadados DataJud ao vivo",
+    };
+  }
+  return null;
+}
+
 export async function abrirProcessoDataJud(
   numeroProcesso: string,
   tribunal = "tjpr"
-): Promise<Caso> {
+): Promise<{ caso: Caso; origem: DataJudOrigemApi }> {
   const resposta = await fetch(`${baseUrl()}/api/datajud/abrir`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -229,11 +257,16 @@ export async function abrirProcessoDataJud(
   if (!resposta.ok) {
     throw new Error(await lerErro(resposta));
   }
-  const corpo = (await resposta.json()) as CasoResposta & { live?: boolean; fonte?: string };
-  if (corpo.zone !== "internal" || !corpo.caso || corpo.fonte !== "datajud") {
-    throw new Error("Resposta inválida do DataJud ao vivo.");
+  const corpo = (await resposta.json()) as CasoResposta & {
+    live?: boolean;
+    fonte?: string;
+    rotulo?: string;
+  };
+  const origem = origemDataJud(corpo);
+  if (corpo.zone !== "internal" || !corpo.caso || !origem) {
+    throw new Error("Resposta inválida do DataJud.");
   }
-  return hidratarPrazos(corpo.caso);
+  return { caso: hidratarPrazos(corpo.caso), origem };
 }
 
 export async function buscarDataJud(params: {
@@ -241,7 +274,7 @@ export async function buscarDataJud(params: {
   assunto?: string;
   classe?: string;
   tribunal?: string;
-}): Promise<{ tribunal: string; hits: DataJudHit[] }> {
+}): Promise<{ tribunal: string; hits: DataJudHit[]; origem: DataJudOrigemApi }> {
   const resposta = await fetch(`${baseUrl()}/api/datajud/buscar`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -258,13 +291,16 @@ export async function buscarDataJud(params: {
   const corpo = (await resposta.json()) as {
     zone?: string;
     fonte?: string;
+    rotulo?: string;
+    live?: boolean;
     tribunal?: string;
     hits?: DataJudHit[];
   };
-  if (corpo.zone !== "internal" || corpo.fonte !== "datajud" || !Array.isArray(corpo.hits)) {
-    throw new Error("Resposta inválida do DataJud ao vivo.");
+  const origem = origemDataJud(corpo);
+  if (corpo.zone !== "internal" || !origem || !Array.isArray(corpo.hits)) {
+    throw new Error("Resposta inválida do DataJud.");
   }
-  return { tribunal: corpo.tribunal || "tjpr", hits: corpo.hits };
+  return { tribunal: corpo.tribunal || "tjpr", hits: corpo.hits, origem };
 }
 
 export async function listarPrevencao(casoId: string): Promise<RelatorioPrevencao[]> {

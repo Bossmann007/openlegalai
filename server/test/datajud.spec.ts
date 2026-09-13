@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { aplicarPoliticaCaso } from "../src/common/security/caso-policy";
 import { ementaCitavel, ementaParaCitacao } from "../src/common/security/cite-or-silent";
 import { CHANCE_INDISPONIVEL } from "../src/common/security/fonte-fato";
@@ -21,6 +21,12 @@ import {
   tribunalAlias,
 } from "../src/modules/datajud/datajud.mapper";
 import { ComparacaoComTaint, DataJudService } from "../src/modules/datajud/datajud.service";
+import {
+  arquivoCachePara,
+  modoDataJud,
+  normalizarTermoCache,
+} from "../src/modules/datajud/datajud.cache";
+import { ORIGEM_CAPTURA, ORIGEM_LIVE } from "../src/modules/datajud/datajud.types";
 import { DissidioService } from "../src/modules/dissidio/dissidio.service";
 import { JurisprudenceService } from "../src/modules/jurisprudence/jurisprudence.service";
 import { CasosService } from "../src/modules/casos/casos.service";
@@ -117,6 +123,8 @@ describe("DataJud mapper", () => {
   it("capa ao vivo não carrega partes", () => {
     const processo = processoDeHit(hitDeSource(SOURCE_COM_PII, "tjpr")!);
     expect(processo.parties).toEqual([]);
+    expect(processo.courtUnit).toBe("");
+    expect(processo.chamber).toBe("COLOMBO - 2ª VARA CÍVEL");
     expect(processo.chamberOrientation).toBe("indeterminada");
   });
 
@@ -142,9 +150,28 @@ describe("DataJud mapper", () => {
 });
 
 describe("DataJud client", () => {
-  it("falha com honestidade quando DATAJUD_API_KEY falta", async () => {
-    const anterior = process.env.DATAJUD_API_KEY;
+  const envAnterior = {
+    key: process.env.DATAJUD_API_KEY,
+    mode: process.env.DATAJUD_MODE,
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    if (envAnterior.key === undefined) {
+      delete process.env.DATAJUD_API_KEY;
+    } else {
+      process.env.DATAJUD_API_KEY = envAnterior.key;
+    }
+    if (envAnterior.mode === undefined) {
+      delete process.env.DATAJUD_MODE;
+    } else {
+      process.env.DATAJUD_MODE = envAnterior.mode;
+    }
+  });
+
+  it("falha com honestidade quando DATAJUD_API_KEY falta em live", async () => {
     delete process.env.DATAJUD_API_KEY;
+    process.env.DATAJUD_MODE = "live";
     const client = new DataJudClient();
 
     await expect(client.buscarPorCnj("0000106-56.2014.8.16.0193", "tjpr")).rejects.toBeInstanceOf(
@@ -153,10 +180,107 @@ describe("DataJud client", () => {
     await expect(client.buscarPorCnj("0000106-56.2014.8.16.0193", "tjpr")).rejects.toThrow(
       /DATAJUD_API_KEY/
     );
+  });
 
-    if (anterior !== undefined) {
-      process.env.DATAJUD_API_KEY = anterior;
-    }
+  it("cache devolve o CNJ da captura e nunca finge live", async () => {
+    process.env.DATAJUD_MODE = "cache";
+    const pesquisa = await new DataJudClient().buscarPorCnj(
+      "0000887-91.2025.8.16.0161",
+      "tjpr"
+    );
+
+    expect(pesquisa.origem).toEqual(ORIGEM_CAPTURA);
+    expect(pesquisa.origem.fonte).toBe("datajud_captura");
+    expect(pesquisa.origem.rotulo).toBe("captura oficial (replay)");
+    expect(pesquisa.hits[0]?.numeroProcesso).toBe("0000887-91.2025.8.16.0161");
+    expect(JSON.stringify(pesquisa.hits)).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}/);
+    expect(JSON.stringify(pesquisa.hits)).not.toMatch(/cpf/i);
+  });
+
+  it("cache da busca Alienação Fiduciária não inventa hits extras", async () => {
+    process.env.DATAJUD_MODE = "cache";
+    const pesquisa = await new DataJudClient().buscar({
+      assunto: "Alienação Fiduciária",
+      tribunal: "tjpr",
+    });
+
+    expect(pesquisa.origem.fonte).toBe("datajud_captura");
+    expect(pesquisa.hits.map((hit) => hit.numeroProcesso)).toEqual([
+      "0000887-91.2025.8.16.0161",
+      "0000106-56.2014.8.16.0193",
+    ]);
+  });
+
+  it("cache miss não inventa hit", async () => {
+    process.env.DATAJUD_MODE = "cache";
+    await expect(
+      new DataJudClient().buscarPorCnj("0000106-56.2014.8.16.0193", "tjpr")
+    ).rejects.toThrow(/Sem captura local/);
+    await expect(
+      new DataJudClient().buscar({ assunto: "Contratos bancários", tribunal: "tjpr" })
+    ).rejects.toThrow(/Sem captura local/);
+  });
+
+  it("auto cai para captura em HTTP 429", async () => {
+    process.env.DATAJUD_MODE = "auto";
+    process.env.DATAJUD_API_KEY = "chave-demo";
+    vi.stubGlobal("fetch", async () => ({ ok: false, status: 429 }));
+
+    const pesquisa = await new DataJudClient().buscarPorCnj(
+      "0000887-91.2025.8.16.0161",
+      "tjpr"
+    );
+
+    expect(pesquisa.origem.fonte).toBe("datajud_captura");
+    expect(pesquisa.hits[0]?.numeroProcesso).toBe("0000887-91.2025.8.16.0161");
+  });
+
+  it("auto sem chave cai para captura do CNJ da demo", async () => {
+    process.env.DATAJUD_MODE = "auto";
+    delete process.env.DATAJUD_API_KEY;
+
+    const pesquisa = await new DataJudClient().buscar({
+      query: "Alienação Fiduciária",
+      tribunal: "tjpr",
+    });
+    expect(pesquisa.origem.fonte).toBe("datajud_captura");
+  });
+
+  it("live não cai para captura em HTTP 429", async () => {
+    process.env.DATAJUD_MODE = "live";
+    process.env.DATAJUD_API_KEY = "chave-demo";
+    vi.stubGlobal("fetch", async () => ({ ok: false, status: 429 }));
+
+    await expect(
+      new DataJudClient().buscarPorCnj("0000887-91.2025.8.16.0161", "tjpr")
+    ).rejects.toThrow(/HTTP 429/);
+  });
+
+  it("auto sem arquivo de captura relança o 429", async () => {
+    process.env.DATAJUD_MODE = "auto";
+    process.env.DATAJUD_API_KEY = "chave-demo";
+    vi.stubGlobal("fetch", async () => ({ ok: false, status: 429 }));
+
+    await expect(
+      new DataJudClient().buscarPorCnj("0000106-56.2014.8.16.0193", "tjpr")
+    ).rejects.toThrow(/HTTP 429/);
+  });
+});
+
+describe("DataJud cache keys", () => {
+  it("só mapeia o CNJ e a busca da demo", () => {
+    expect(modoDataJud(undefined)).toBe("auto");
+    expect(modoDataJud("CACHE")).toBe("cache");
+    expect(normalizarTermoCache("Alienação Fiduciária")).toBe("alienacao fiduciaria");
+    expect(
+      arquivoCachePara({ kind: "cnj", alias: "tjpr", digitos: "00008879120258160161" })
+    ).toBe("tjpr-00008879120258160161.json");
+    expect(
+      arquivoCachePara({ kind: "busca", alias: "tjpr", termo: "Alienação Fiduciária" })
+    ).toBe("tjpr-busca-alienacao.json");
+    expect(
+      arquivoCachePara({ kind: "cnj", alias: "tjpr", digitos: "00001065620148160193" })
+    ).toBeNull();
   });
 });
 
@@ -276,7 +400,7 @@ describe("comparação mista e cite-or-silent", () => {
     const servico = new DataJudService(
       {
         alias: () => "tjpr",
-        buscarPorCnj: async () => [hit],
+        buscarPorCnj: async () => ({ hits: [hit], origem: ORIGEM_LIVE }),
         buscar: async () => {
           throw new Error("related search down");
         },
@@ -339,6 +463,7 @@ describe("SafeDTO DataJud", () => {
         blindagem: [],
         fonte: "indisponivel",
       },
+      origem: ORIGEM_LIVE,
       textoSensivel: [caso.resumo, caso.cliente, caso.peticoes[0].titulo],
       entidades: ["Maria Souza"],
     };
@@ -385,6 +510,17 @@ describe("SafeDTO DataJud", () => {
     expect(busca.safeParse("x".repeat(201)).success).toBe(false);
   });
 
+  it("capa DataJud pública atravessa o SafeDTO sem vazar unidade como parte", () => {
+    const processo = processoDeHit(hitDeSource(SOURCE_COM_PII, "tjpr")!);
+    const dto = declassify.resumoDeCaso(rotular(processo, "publico", "datajud_captura:capa"));
+
+    expect(dto.tipo).toBe("case_summary");
+    expect(dto.conteudo.orgaoJulgador).toBe("COLOMBO - 2ª VARA CÍVEL");
+    expect(dto.conteudo.quantidadePartes).toBe(0);
+    expect(dto.declassificacao.fontes).toContain("datajud_captura:capa");
+    expect(JSON.stringify(dto)).not.toContain("Maria Souza");
+  });
+
   it("conhecimento DataJud sai sem ementa", () => {
     const fixture = fixtureDeHit(hitDeSource(SOURCE_COM_PII, "tjpr")!, 0);
     const dto = declassify.conhecimento(
@@ -395,6 +531,56 @@ describe("SafeDTO DataJud", () => {
     expect(dto.conteudo.itens[0].fonte).toBe("datajud");
     expect(dto.conteudo.itens[0].citavel).toBe(false);
     expect(dto.conteudo.itens[0].ementa).toBeNull();
+  });
+
+  it("conhecimento de captura declara datajud_captura e permanece não citável", () => {
+    const fixture = fixtureDeHit(hitDeSource(SOURCE_COM_PII, "tjpr")!, 0);
+    const dto = declassify.conhecimento(
+      rotular([fixture], "publico", "datajud_captura:metadados"),
+      ["Alienação Fiduciária"]
+    );
+
+    expect(dto.conteudo.itens[0].fonte).toBe("datajud_captura");
+    expect(dto.conteudo.itens[0].citavel).toBe(false);
+    expect(dto.conteudo.itens[0].ementa).toBeNull();
+    expect(dto.declassificacao.fontes).toContain("datajud_captura:metadados");
+  });
+
+  it("jurimetria mista de captura não se apresenta como live", () => {
+    const hit = hitDeSource(SOURCE_COM_PII, "tjpr")!;
+    const dto = declassify.jurimetriaMista(
+      rotular(
+        {
+          processo: { ...processoDeHit(hit), parties: [] },
+          classificadas: [],
+          amostra: {
+            total: 2,
+            aoVivo: 1,
+            acervo: 1,
+            honestidade: {
+              live: "datajud_captura",
+              acervo: "fixture",
+              ementaOracle: false,
+            },
+          },
+          dissidio: { narrative: "comparação descritiva", conflicts: [] },
+          chance: {
+            score: 0,
+            label: CHANCE_INDISPONIVEL,
+            rationale: CHANCE_INDISPONIVEL,
+            blindagem: [],
+            fonte: "indisponivel",
+          },
+          origem: ORIGEM_CAPTURA,
+        },
+        "publico",
+        "datajud_captura:comparacao"
+      )
+    );
+
+    expect(dto.conteudo.honestidade.live).toBe("datajud_captura");
+    expect(dto.conteudo.sintese).toContain("captura oficial (replay)");
+    expect(dto.conteudo.sintese).not.toMatch(/metadado\(s\) DataJud ao vivo/);
   });
 
   it("RBAC libera tools DataJud no papel certo e nega o resto", () => {

@@ -1,13 +1,29 @@
 import { Injectable } from "@nestjs/common";
-import { DATAJUD_BASE, DataJudHit } from "./datajud.types";
 import {
+  arquivoCachePara,
+  ChaveCache,
+  hitsDoCache,
+  lerCacheElastic,
+  modoDataJud,
+  recorteCache,
+} from "./datajud.cache";
+import {
+  erroCacheMiss,
   erroChaveRecusada,
   erroInvalido,
   erroRede,
   erroSemChave,
   erroTribunal,
+  DataJudException,
 } from "./datajud.errors";
 import { hitDeSource, tribunalAlias, tribunalPadrao } from "./datajud.mapper";
+import {
+  DATAJUD_BASE,
+  DataJudHit,
+  DataJudPesquisa,
+  ORIGEM_CAPTURA,
+  ORIGEM_LIVE,
+} from "./datajud.types";
 
 type ElasticHit = {
   _source?: Record<string, unknown>;
@@ -35,7 +51,7 @@ export class DataJudClient {
     return tribunal ? tribunalAlias(tribunal) : tribunalPadrao();
   }
 
-  async buscarPorCnj(numeroProcesso: string, tribunal?: string): Promise<DataJudHit[]> {
+  async buscarPorCnj(numeroProcesso: string, tribunal?: string): Promise<DataJudPesquisa> {
     const alias = this.alias(tribunal);
     const numero = numeroProcesso.trim();
     if (!numero) {
@@ -48,12 +64,16 @@ export class DataJudClient {
       should.push({ match: { numeroProcesso: digitos } });
     }
 
-    return this.pesquisar(alias, {
-      size: 5,
-      query: {
-        bool: { should, minimum_should_match: 1 },
+    return this.pesquisar(
+      alias,
+      {
+        size: 5,
+        query: {
+          bool: { should, minimum_should_match: 1 },
+        },
       },
-    });
+      { kind: "cnj", alias, digitos }
+    );
   }
 
   async buscar(params: {
@@ -61,7 +81,7 @@ export class DataJudClient {
     assunto?: string;
     classe?: string;
     tribunal?: string;
-  }): Promise<DataJudHit[]> {
+  }): Promise<DataJudPesquisa> {
     const alias = this.alias(params.tribunal);
     const should: Record<string, unknown>[] = [];
     const assunto = (params.assunto || "").trim();
@@ -87,18 +107,90 @@ export class DataJudClient {
       throw erroInvalido("Informe assunto, classe ou texto para buscar no DataJud.");
     }
 
-    return this.pesquisar(alias, {
-      size: 12,
-      query: {
-        bool: { should, minimum_should_match: 1 },
+    return this.pesquisar(
+      alias,
+      {
+        size: 12,
+        query: {
+          bool: { should, minimum_should_match: 1 },
+        },
       },
-    });
+      { kind: "busca", alias, termo: [assunto, classe, texto].filter(Boolean).join(" ") }
+    );
   }
 
   private async pesquisar(
     alias: string,
+    corpo: Record<string, unknown>,
+    chave: ChaveCache
+  ): Promise<DataJudPesquisa> {
+    const modo = modoDataJud();
+
+    switch (modo) {
+      case "cache":
+        return this.lerCaptura(chave);
+      case "live":
+        return this.consultarLive(alias, corpo);
+      case "auto":
+        try {
+          return await this.consultarLive(alias, corpo);
+        } catch (erro) {
+          if (!podeReplay(erro)) {
+            throw erro;
+          }
+          const replay = this.tentarCaptura(chave);
+          if (replay) {
+            return replay;
+          }
+          throw erro;
+        }
+      default: {
+        const neverModo: never = modo;
+        return neverModo;
+      }
+    }
+  }
+
+  private async consultarLive(
+    alias: string,
     corpo: Record<string, unknown>
-  ): Promise<DataJudHit[]> {
+  ): Promise<DataJudPesquisa> {
+    return {
+      hits: await this.buscarNaApi(alias, corpo),
+      origem: ORIGEM_LIVE,
+    };
+  }
+
+  private lerCaptura(chave: ChaveCache): DataJudPesquisa {
+    const replay = this.tentarCaptura(chave);
+    if (!replay) {
+      throw erroCacheMiss(recorteCache(chave));
+    }
+    return replay;
+  }
+
+  private tentarCaptura(chave: ChaveCache): DataJudPesquisa | null {
+    const arquivo = arquivoCachePara(chave);
+    if (!arquivo) {
+      return null;
+    }
+
+    const json = lerCacheElastic(arquivo);
+    if (!json) {
+      return null;
+    }
+
+    const hits = hitsDoCache(json)
+      .map((item) => hitDeSource(sanitizarSource(item._source), chave.alias))
+      .filter((item): item is DataJudHit => item !== null);
+
+    return {
+      hits,
+      origem: ORIGEM_CAPTURA,
+    };
+  }
+
+  private async buscarNaApi(alias: string, corpo: Record<string, unknown>): Promise<DataJudHit[]> {
     const chave = (process.env.DATAJUD_API_KEY || "").trim();
     if (!chave) {
       throw erroSemChave();
@@ -153,4 +245,26 @@ function sanitizarSource(source: Record<string, unknown> | undefined): Record<st
     delete limpo[campo];
   }
   return limpo;
+}
+
+function podeReplay(erro: unknown): boolean {
+  if (!(erro instanceof DataJudException)) {
+    return true;
+  }
+
+  switch (erro.kind) {
+    case "rede":
+    case "sem_chave":
+      return true;
+    case "chave_recusada":
+    case "tribunal":
+    case "vazio":
+    case "invalido":
+    case "cache_miss":
+      return false;
+    default: {
+      const neverKind: never = erro.kind;
+      return neverKind;
+    }
+  }
 }

@@ -84,7 +84,10 @@ export function aplicarPoliticaCaso(caso: Caso): Caso {
       riscos: sanitizeUntrustedList(caso.jurimetria?.riscos || []),
       honestidade: caso.jurimetria?.honestidade
         ? {
-            live: "datajud_metadata" as const,
+            live:
+              caso.jurimetria.honestidade.live === "datajud_captura"
+                ? ("datajud_captura" as const)
+                : ("datajud_metadata" as const),
             acervo:
               caso.jurimetria.honestidade.acervo === "fixture"
                 ? ("fixture" as const)
