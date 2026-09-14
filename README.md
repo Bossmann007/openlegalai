@@ -1,3 +1,12 @@
+<!-- ENZO-PORTFOLIO-BRAND -->
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:111111,100:1E3A8A&height=165&section=header&text=OpenLegalAI&fontSize=42&fontColor=ffffff&animation=fadeIn&fontAlignY=35&desc=Legal%20research%20workspace%20built%20during%20Hackathon%20OAB%20Rush.&descAlignY=57&descSize=14" alt="OpenLegalAI" />
+</p>
+
+<p align="center"><strong>TypeScript · React · NestJS</strong></p>
+
+---
+
 # OpenLegalAI
 
 Workspace jurídico da **Zhegga Advogados Associados**: casos do TiDB, ementas oficiais do TJPR e modelos para escrever peça.
@@ -27,3 +36,8 @@ pnpm dev           # tela em http://localhost:8080
 
 - **Client:** React + Vite em `client/`
 - **Server:** NestJS em `server/` (`common`, `config`, `modules`, prefixo `/api`)
+
+<!-- ENZO-PORTFOLIO-BRAND-FOOTER -->
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:111111,100:1E3A8A&height=85&section=footer" alt="Footer" />
+</p>
